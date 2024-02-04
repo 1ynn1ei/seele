@@ -25,9 +25,18 @@ impl<'a> Stream<'a> {
         self.data.get(self.idx)
     }
 
-    pub fn expect(&self, check: &u8) -> bool {
+    pub fn expect(&self, check: u8) -> bool {
         let cur = self.data.get(self.idx).unwrap();
-        cur == check
+        *cur == check
+    }
+
+    pub fn expect_and_advance(&mut self, check: u8) -> bool {
+        if self.expect(check) {
+            self.advance();
+            true
+        } else {
+            false
+        }
     }
 
     pub fn slice(&self, start: usize) -> &'a [u8] {
@@ -74,7 +83,7 @@ impl<'a> Parser<'a> {
         loop {
             if let Some(char) = self.stream.current() {
                 match char {
-                    b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' => {
+                    b'"' | b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' => {
                         self.stream.advance();
                     },
                     _ => {
@@ -83,6 +92,16 @@ impl<'a> Parser<'a> {
                 }
             }
         }
+    }
+
+    fn read_attribute(&mut self) -> (&'a [u8], &'a [u8]) {
+        self.skip_whitespace();
+        let identifier = self.read_identifier();
+        let value = match self.stream.expect_and_advance(b'=') {
+            true => self.read_identifier(),
+            false => "true".as_bytes() 
+        };
+        (identifier, value)
     }
 
     fn read_to(&mut self, needle: u8) -> &'a [u8] {
@@ -140,7 +159,10 @@ mod test {
     }
     #[test]
     fn test_read_attr() {
-        let test_value = "<div class=\"test\">";
-        todo!();
+        let test_value = "class=\"test\">".as_bytes();
+        let mut parser = Parser::new(test_value);
+        let (attr_identifier, attr_value) = parser.read_attribute();
+        assert_eq!("class".as_bytes(), attr_identifier);
+        assert_eq!("\"test\"".as_bytes(), attr_value);
     }
 }

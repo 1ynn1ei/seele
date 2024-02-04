@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-pub type AttrMap = HashMap<String, String>;
+pub type AttrMap<'a> = HashMap<&'a [u8], &'a [u8]>;
 
 pub struct Node<'a> {
     children: Vec<Node<'a>>,
@@ -13,7 +13,7 @@ pub enum NodeType<'a> {
 
 pub struct ElementData<'a> {
     tag_name: &'a [u8],
-    attributes: AttrMap,
+    attributes: AttrMap<'a>,
 }
 
 impl<'a> Node<'a> {
@@ -24,7 +24,7 @@ impl<'a> Node<'a> {
         }
     }
 
-    pub fn elem(name: &'a [u8], attrs: AttrMap, children: Vec<Node<'a>>) -> Self {
+    pub fn elem(name: &'a [u8], attrs: AttrMap<'a>, children: Vec<Node<'a>>) -> Self {
         Node {
             children,
             node_type: NodeType::Element(ElementData {

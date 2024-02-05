@@ -17,7 +17,7 @@ pub struct ElementData<'a> {
 }
 
 impl<'a> Node<'a> {
-    fn text(data: &'a [u8]) -> Self {
+    pub fn text(data: &'a [u8]) -> Self {
         Node {
             children: Vec::new(),
             node_type: NodeType::Text(data)
@@ -36,7 +36,7 @@ impl<'a> Node<'a> {
 
     pub fn get_tag_name(&self) -> &'a [u8] {
         match &self.node_type {
-            NodeType::Text(_) => "text".as_bytes(),
+            NodeType::Text(data) => data,
             NodeType::Element(data) => {
                 data.tag_name
             }

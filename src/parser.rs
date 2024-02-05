@@ -56,7 +56,7 @@ impl<'a> Parser<'a> {
     }
 
 
-    fn read_tag(&mut self) -> dom::Node {
+    fn parse_element(&mut self) -> dom::Node {
         // we have read a b'<' already
         let attributes = dom::AttrMap::new();
         self.skip_whitespace().unwrap();
@@ -66,6 +66,13 @@ impl<'a> Parser<'a> {
         // yes, attributes is empty
         // no keep going until we are at end of tag
         dom::Node::elem(tag_name, attributes, Vec::new())
+    }
+
+    fn parse_text(&mut self) -> dom::Node {
+        // we hit a non tag identifier
+        // so we will consume anything up until a tag identifier
+        let text = self.read_to(b'<');
+        dom::Node::text(text)
     }
 
     fn skip_whitespace(&mut self) -> Option<()> {
@@ -154,15 +161,21 @@ mod test {
     fn test_read_tag() {
         let test_value = "p >".as_bytes();
         let mut parser = Parser::new(test_value);
-        let node = parser.read_tag();
+        let node = parser.parse_element();
         assert_eq!(node.get_tag_name(), "p".as_bytes());
     }
     #[test]
-    fn test_read_attr() {
+    fn test_parse_attr() {
         let test_value = "class=\"test\">".as_bytes();
         let mut parser = Parser::new(test_value);
         let (attr_identifier, attr_value) = parser.read_attribute();
         assert_eq!("class".as_bytes(), attr_identifier);
         assert_eq!("\"test\"".as_bytes(), attr_value);
+    }
+    #[test]
+    fn test_parse_text() {
+        let mut parser = Parser::new("this is just random text until <h>".as_bytes());
+        let node = parser.parse_text();
+        assert_eq!("this is just random text until ".as_bytes(), node.get_tag_name());
     }
 }

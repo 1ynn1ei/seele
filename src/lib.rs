@@ -1,2 +1,3 @@
-mod dom;
+mod html;
 mod parser;
+mod stream;

@@ -1,11 +1,11 @@
 
-pub struct Stream<'a> {
-    pub data: &'a [u8],
+pub struct Stream<'stream> {
+    pub data: &'stream [u8],
     idx: usize,
 }
 
-impl<'a> Stream<'a> {
-    pub fn new(data: &'a[u8]) -> Self {
+impl<'stream> Stream<'stream> {
+    pub fn new(data: &'stream[u8]) -> Self {
         Stream {
             data,
             idx: 0
@@ -20,12 +20,16 @@ impl<'a> Stream<'a> {
         self.idx += 1;
     }
 
+    pub fn reconsume(&mut self) {
+        self.idx -= 1;
+    }
+
     pub fn is_eof(&self) -> bool {
         self.idx >= self.data.len()
     }
 
-    pub fn current(&self) -> Option<&u8> {
-        self.data.get(self.idx)
+    pub fn current(&self) -> &u8 {
+        &self.data[self.idx]
     }
 
     pub fn expect(&self, check: u8) -> bool {
@@ -42,7 +46,7 @@ impl<'a> Stream<'a> {
         }
     }
 
-    pub fn slice(&self, start: usize) -> &'a [u8] {
+    pub fn slice(&self, start: usize) -> &'stream [u8] {
         &self.data[start..self.idx]
     }
 }

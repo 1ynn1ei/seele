@@ -121,9 +121,9 @@ impl<'stream> Tokenizer<'stream> {
     fn tag_name_state(&mut self, char: &u8) -> Result<(), TokenizerError> {
         self.stream.advance();
         match char {
-            b'\t' => todo!(),
-            0x0A /* LF */ => todo!(),
-            0x0C /* FF */ => todo!(),
+            b'\t' |
+            0x0A /* LF */ |
+            0x0C /* FF */ |
             b' ' => todo!(),
             b'/' => todo!(),
             b'>' => todo!(),

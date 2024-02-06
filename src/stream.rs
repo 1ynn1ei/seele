@@ -28,7 +28,7 @@ impl<'stream> Stream<'stream> {
         self.idx >= self.data.len()
     }
 
-    pub fn current(&self) -> &u8 {
+    pub fn current(&self) -> &'stream u8 {
         &self.data[self.idx]
     }
 

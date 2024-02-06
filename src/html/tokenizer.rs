@@ -1,6 +1,9 @@
 use crate::html::tokens::{Tokens, Tag};
 use crate::stream::Stream;
 
+const LOWERCASE_OFFSET : u8 = 0x0020;
+const REPLACEMENT_CHARACTER : u8 = 0xFFFD;
+
 pub type TokenList<'stream> = Vec<Tokens<'stream>>;
 pub enum States {
     Data,
@@ -88,6 +91,7 @@ pub enum States {
 pub enum TokenizerError {
     WorkingTokenCollision,
     WorkingTokenUnexpectedEmpty,
+    WorkingTokenEmptyCommit,
 }
 
 #[derive(Default)]
@@ -115,26 +119,6 @@ impl<'stream> Tokenizer<'stream> {
         }
     }
 
-    pub fn make_tokens(&mut self) -> Result<TokenList<'stream>, TokenizerError> {
-        let tokens : Vec<Tokens<'stream>> = TokenList::new();
-        // check EOF before rest
-        // if EOF, go into EOF handler. some states create errors
-        let char = self.stream.current();
-        match &self.state {
-            States::Data => self.data_state(char)?,
-            States::RCData => todo!(),
-            States::RawText => todo!(),
-            States::ScriptData => todo!(),
-            States::PlainText => todo!(),
-            States::TagOpen => self.tag_open_state(char)?,
-            States::EndTagOpen => todo!(),
-            States::TagName => self.tag_name_state(char)?,
-            _ => todo!(),
-        }
-
-        Ok(tokens)
-    }
-
     fn prepare_working_token(&mut self, token: Tokens) -> Result<(), TokenizerError> {
         match self.working_token.token {
             Some(_) => Err(TokenizerError::WorkingTokenCollision),
@@ -159,9 +143,45 @@ impl<'stream> Tokenizer<'stream> {
     fn push_working_token(&mut self, char: &'stream u8) {
         self.working_token.value.push(char);
     }
+
+    fn commit_working_token(&mut self) -> Result<(), TokenizerError> {
+        match &self.working_token.token {
+            Some(token) => {
+                // self.tokens.push(token);
+                self.clear_working_token()?;
+                Ok(())
+            },
+            None => Err(TokenizerError::WorkingTokenEmptyCommit)
+        }
+    }
+
+    pub fn make_tokens(&mut self) -> Result<&TokenList<'stream>, TokenizerError> {
+        // check EOF before rest
+        loop {
+            if self.stream.is_eof() {
+                // if EOF, go into EOF handler. some states create errors
+                self.tokens.push(Tokens::EndOfFile);
+                return Ok(&self.tokens);
+            } else {
+                let char = self.stream.current();
+                match &self.state {
+                    States::Data => self.data_state(char)?,
+                    States::RCData => todo!(),
+                    States::RawText => todo!(),
+                    States::ScriptData => todo!(),
+                    States::PlainText => todo!(),
+                    States::TagOpen => self.tag_open_state(char)?,
+                    States::EndTagOpen => todo!(),
+                    States::TagName => self.tag_name_state(char)?,
+                    _ => todo!(),
+                }
+            }
+        }
+    }
+
     
     //https://html.spec.whatwg.org/multipage/parsing.html#data-state
-    fn data_state(&mut self, char: &u8) -> Result<(), TokenizerError> {
+    fn data_state(&mut self, char: &'stream u8) -> Result<(), TokenizerError> {
         self.stream.advance();
         match char {
             b'&' => {
@@ -182,12 +202,20 @@ impl<'stream> Tokenizer<'stream> {
         Ok(())
     }
     //https://html.spec.whatwg.org/multipage/parsing.html#tag-open-state
-    fn tag_open_state(&mut self, char: &u8) -> Result<(), TokenizerError> {
+    fn tag_open_state(&mut self, char: &'stream u8) -> Result<(), TokenizerError> {
         self.stream.advance();
         match char {
-            b'!' => todo!(),
-            b'/' => todo!(),
-            b'?' => todo!(),
+            b'!' => {
+                self.state = States::MarkupDeclarationOpen;
+            },
+            b'/' => {
+                self.state = States::EndTagOpen;
+            },
+            b'?' => {
+                self.state = States::BogusComment;
+                self.prepare_working_token(Tokens::Comment(&[]));
+                self.stream.reconsume();
+            },
             b'a'..=b'z' | b'A'..=b'Z' => {
                 self.state = States::TagName;
                 self.prepare_working_token(Tokens::StartTag(Tag::new()));
@@ -203,7 +231,7 @@ impl<'stream> Tokenizer<'stream> {
         Ok(())
     }
 
-    fn end_tag_open_state(&mut self, char: &u8) -> Result<(), TokenizerError> {
+    fn end_tag_open_state(&mut self, char: &'stream u8) -> Result<(), TokenizerError> {
         self.stream.advance();
         match char {
             b'a'..=b'z' | b'A'..=b'Z' => {
@@ -217,24 +245,37 @@ impl<'stream> Tokenizer<'stream> {
             },
             _ => {
                 // TODO: invalid-first-character-of-tag-name error
-                todo!()
+                self.state = States::BogusComment;
+                self.prepare_working_token(Tokens::Comment(&[]));
+                self.stream.reconsume();
             }
         }
         Ok(())
     }
 
-    fn tag_name_state(&mut self, char: &u8) -> Result<(), TokenizerError> {
+    fn tag_name_state(&mut self, char: &'stream u8) -> Result<(), TokenizerError> {
         self.stream.advance();
         match char {
             b'\t' |
             0x0A /* LF */ |
             0x0C /* FF */ |
-            b' ' => todo!(),
-            b'/' => todo!(),
-            b'>' => todo!(),
-            b'A'..=b'Z' => todo!(),
-            b'\0' => todo!(),
-            _ => todo!(),
+            b' ' => { self.state = States::BeforeAttributeName; },
+            b'/' => { self.state = States::SelfClosingStartTag; },
+            b'>' => {
+                self.state = States::Data;
+                self.commit_working_token()?;
+            },
+            b'A'..=b'Z' => {
+                // TODO: handle lowercasing of tags during the tree creation
+                self.push_working_token(&(char));
+            },
+            b'\0' => {
+                // TODO: unexpected-null-character error
+                self.push_working_token(&REPLACEMENT_CHARACTER);
+            },
+            _ => {
+                self.push_working_token(char);
+            },
         }
         Ok(())
     }

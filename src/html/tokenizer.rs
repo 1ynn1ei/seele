@@ -11,8 +11,79 @@ pub enum States {
     TagOpen,
     EndTagOpen,
     TagName,
+    RCDataLessThanSign,
+    RCDataEndTagOpen,
+    RCDataEndTagName,
+    RawTextLessThanSign,
+    RawTextEndTagOpen,
+    RawTextEndTagName,
+    ScriptDataLessThanSign,
+    ScriptDataEndTagOpen,
+    ScriptDataEndTagName,
+    ScriptDataEscapeStart,
+    ScriptDataEscapeStartDash,
+    ScriptDataEscaped,
+    ScriptDataEscapedDash,
+    ScriptDataEscapedDashDash,
+    ScriptDataEscapedLessThanSign,
+    ScriptDataEscapedEndTagOpen,
+    ScriptDataEscapedEndTagName,
+    ScriptDataDoubleEscapeStart,
+    ScriptDataDoubleEscaped,
+    ScriptDataDoubleEscapedDash,
+    ScriptDataDoubleEscapedDashDash,
+    ScriptDataDoubleEscapedLessThanSign,
+    ScriptDataDoubleEscapeEnd,
+    BeforeAttributeName,
+    AttributeName,
+    AfterAttributeName,
+    AttributeValueDoubleQuoted,
+    AttributeValueSingleQuoted,
+    AttributeValueUnquoted,
+    AfterAttributeValueQuoted,
+    SelfClosingStartTag,
+    BogusComment,
+    MarkupDeclarationOpen,
+    CommentStart,
+    CommentStartDash,
+    Comment,
+    CommentLessThanSign,
+    CommentLessThanSignBang,
+    CommentLessThanSignBangDash,
+    CommentLessThanSignBangDashDash,
+    CommentEndDash,
+    CommentEnd,
+    CommentEndBang,
+    DocType,
+    BeforeDocType,
+    DocTypeName,
+    AfterDocTypeName,
+    AfterDocTypeNamePublicKeyword,
+    BeforeDocTypePublicIdentifier,
+    DocTypePublicIdentifierDoubleQuoted,
+    DocTypePublicIdentifierSingleQuoted,
+    AfterDocTypePublicIdentifier,
+    BetweenDocTypePublicSystemIdentifiers,
+    AfterDocTypeSystemKeyword,
+    BeforeDocTypeSystemIdentifier,
+    DocTypeSystemIdentifierDoubleQuoted,
+    DocTypeSystemIdentifierSingleQuoted,
+    AfterDocTypeSystemIdentifier,
+    BogusDocType,
+    CDataSection,
+    CDataSectionBracket,
+    CDataSectionEnd,
     CharacterReference,
+    NamedCharacterReference,
+    AmbiguousAmpersand,
+    NumericCharacterReference,
+    HexadecimalCharacterReferenceStart,
+    DecimalCharacterReferenceStart,
+    HexadecimalCharacterReference,
+    DecimalCharacterReference,
+    NumericCharacterReferenceEnd,
 }
+
 #[derive(Debug)]
 pub enum TokenizerError {
     WorkingTokenCollision,
@@ -136,8 +207,18 @@ impl<'stream> Tokenizer<'stream> {
         self.stream.advance();
         match char {
             b'a'..=b'z' | b'A'..=b'Z' => {
+                self.state = States::TagName;
+                self.prepare_working_token(Tokens::EndTag(Tag::new()));
+                self.stream.reconsume();
             },
-            _ => {}
+            b'>' => {
+                // TODO: missing-end-tag-name error
+                self.state = States::Data;
+            },
+            _ => {
+                // TODO: invalid-first-character-of-tag-name error
+                todo!()
+            }
         }
         Ok(())
     }

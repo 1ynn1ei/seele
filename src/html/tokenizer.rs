@@ -1,4 +1,4 @@
-use crate::html::tokens::Tokens;
+use crate::html::tokens::{Tokens, Tag};
 use crate::stream::Stream;
 
 pub type TokenList<'stream> = Vec<Tokens<'stream>>;
@@ -19,12 +19,18 @@ pub enum TokenizerError {
     WorkingTokenUnexpectedEmpty,
 }
 
+#[derive(Default)]
+pub struct WorkingToken<'stream> {
+    token: Option<Tokens<'stream>>,
+    value: Vec<&'stream u8>
+}
+
 pub struct Tokenizer<'stream> {
     stream: Stream<'stream>,
     state: States,
     return_state: States,
     tokens: TokenList<'stream>,
-    working_token: Vec<&'stream u8>, 
+    working_token: WorkingToken<'stream>,
 }
 
 impl<'stream> Tokenizer<'stream> {
@@ -34,7 +40,7 @@ impl<'stream> Tokenizer<'stream> {
             state: States::Data,
             return_state: States::Data,
             tokens: TokenList::new(),
-            working_token: Vec::new(),
+            working_token: WorkingToken::default()
         }
     }
 
@@ -58,21 +64,29 @@ impl<'stream> Tokenizer<'stream> {
         Ok(tokens)
     }
 
-    fn prepare_working_token(&mut self) -> Result<(), TokenizerError> {
-        if self.working_token.len() > 0 {
-            Err(TokenizerError::WorkingTokenCollision)
-        } else {
-            Ok(())
+    fn prepare_working_token(&mut self, token: Tokens) -> Result<(), TokenizerError> {
+        match self.working_token.token {
+            Some(_) => Err(TokenizerError::WorkingTokenCollision),
+            None => {
+                self.working_token.token = Some(token);
+                Ok(())
+            }
         }
     }
 
     fn clear_working_token(&mut self) -> Result<(), TokenizerError> {
-        if self.working_token.len() > 0 {
-            self.working_token = Vec::new();
-            Ok(())
-        } else {
-            Err(TokenizerError::WorkingTokenUnexpectedEmpty)
+        match self.working_token.token {
+            Some(_) => {
+                self.working_token.token = None;
+                self.working_token.value = Vec::new();
+                Ok(())
+            },
+            None => Err(TokenizerError::WorkingTokenUnexpectedEmpty)
         }
+    }
+
+    fn push_working_token(&mut self, char: &'stream u8) {
+        self.working_token.value.push(char);
     }
     
     //https://html.spec.whatwg.org/multipage/parsing.html#data-state
@@ -96,7 +110,7 @@ impl<'stream> Tokenizer<'stream> {
         }
         Ok(())
     }
-
+    //https://html.spec.whatwg.org/multipage/parsing.html#tag-open-state
     fn tag_open_state(&mut self, char: &u8) -> Result<(), TokenizerError> {
         self.stream.advance();
         match char {
@@ -105,7 +119,7 @@ impl<'stream> Tokenizer<'stream> {
             b'?' => todo!(),
             b'a'..=b'z' | b'A'..=b'Z' => {
                 self.state = States::TagName;
-                self.prepare_working_token();
+                self.prepare_working_token(Tokens::StartTag(Tag::new()));
                 self.stream.reconsume();
             },
             _ => {
@@ -114,6 +128,16 @@ impl<'stream> Tokenizer<'stream> {
                 self.tokens.push(Tokens::Character(&b'<'));
                 self.stream.reconsume();
             }
+        }
+        Ok(())
+    }
+
+    fn end_tag_open_state(&mut self, char: &u8) -> Result<(), TokenizerError> {
+        self.stream.advance();
+        match char {
+            b'a'..=b'z' | b'A'..=b'Z' => {
+            },
+            _ => {}
         }
         Ok(())
     }

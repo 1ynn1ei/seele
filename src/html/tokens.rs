@@ -10,6 +10,8 @@ pub enum Tokens<'stream> {
     EndOfFile,
 }
 
+
+
 //https://html.spec.whatwg.org/multipage/parsing.html#tokenization
 #[derive(Debug)]
 pub struct DocType<'stream> {
@@ -34,18 +36,23 @@ pub type AttrMap<'stream> = HashMap<&'stream [u8], &'stream [u8]>;
 
 #[derive(Debug)]
 pub struct Tag<'stream> {
-    name: &'stream [u8],
+    name: Option<&'stream [u8]>,
     self_closing: bool,
     attributes: AttrMap<'stream>
 }
 
 impl<'stream> Tag<'stream> {
-    pub fn new(name: &'stream [u8]) -> Self {
+    pub fn new() -> Self {
         Self {
-            name,
+            name: None,
             self_closing: false, 
             attributes: AttrMap::new(),
         }
     }
+
+    pub fn set_name(&mut self, data: &'stream [u8]) {
+        self.name = Some(data);
+    }
 }
+
 

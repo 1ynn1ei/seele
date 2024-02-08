@@ -9,7 +9,9 @@ fn main() {
     let mut tokenizer = Tokenizer::new(&data);
     match tokenizer.make_tokens() {
         Ok(res) => {
-            println!("{:?}", res);
+            for token in res {
+                println!("{:?}", token);
+            }
         },
         Err(err) => {
             println!("{:?}", err);

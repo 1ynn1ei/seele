@@ -1,11 +1,12 @@
 use crate::html::{
-    tokens::{TokenBuilder, Token, TokenVariant, Tag, RefBuffer},
+    tokens::{TokenBuilder, Token, TokenVariant },
     HTMLError
 };
 use crate::stream::Stream;
 const LOWERCASE_OFFSET : u8 = 0x0020;
 
 pub type TokenList<'stream> = Vec<Token<'stream>>;
+#[derive(Debug)]
 pub enum States {
     Data,
     RCData,
@@ -41,6 +42,7 @@ pub enum States {
     BeforeAttributeName,
     AttributeName,
     AfterAttributeName,
+    BeforeAttributeValue,
     AttributeValueDoubleQuoted,
     AttributeValueSingleQuoted,
     AttributeValueUnquoted,
@@ -110,6 +112,7 @@ impl<'stream> Tokenizer<'stream> {
     pub fn make_tokens(&mut self) -> Result<&TokenList<'stream>, HTMLError> {
         // check EOF before rest
         loop {
+            println!("{:?}", self.state);
             if self.stream.is_eof() {
                 // if EOF, go into EOF handler. some states create errors
                 self.tokens.push(Token::EndOfFile);
@@ -123,7 +126,7 @@ impl<'stream> Tokenizer<'stream> {
     pub fn run_state(&mut self) -> Result<(), HTMLError> {
         let char = self.stream.current();
         self.stream.advance();
-        match &self.state {
+        match self.state {
             //https://html.spec.whatwg.org/multipage/parsing.html#data-state
             States::Data => {
                 match char {
@@ -136,19 +139,20 @@ impl<'stream> Tokenizer<'stream> {
                     },
                     b'\0' => {
                         // TODO: log unexpected-null-character error
-                        self.builder.set_variant(TokenVariant::Character);
+                        self.builder.set_variant(TokenVariant::Character)?;
                         self.builder.buffer.push(char);
                         self.tokens.push(self.builder.build());
                         self.builder = TokenBuilder::default();
                     },
                     _ => {
-                        self.builder.set_variant(TokenVariant::Character);
+                        self.builder.set_variant(TokenVariant::Character)?;
                         self.builder.buffer.push(char);
                         self.tokens.push(self.builder.build());
                         self.builder = TokenBuilder::default();
                     }
                 }
             },
+
             States::RCData => {
                 match char {
                     b'&' => {
@@ -162,13 +166,14 @@ impl<'stream> Tokenizer<'stream> {
                         self.builder.tag.name.push(&0xFD);
                     },
                     _ => {
-                        self.builder.set_variant(TokenVariant::Character);
+                        self.builder.set_variant(TokenVariant::Character)?;
                         self.builder.buffer.push(char);
                         self.tokens.push(self.builder.build());
                         self.builder = TokenBuilder::default();
                     }
                 }
             },
+            
             States::RawText => {
                 match char {
                     b'<' => self.state = States::RawTextLessThanSign,
@@ -178,13 +183,14 @@ impl<'stream> Tokenizer<'stream> {
                         self.builder.tag.name.push(&0xFD);
                     },
                     _ => {
-                        self.builder.set_variant(TokenVariant::Character);
+                        self.builder.set_variant(TokenVariant::Character)?;
                         self.builder.buffer.push(char);
                         self.tokens.push(self.builder.build());
                         self.builder = TokenBuilder::default();
                     }
                 }
             },
+
             States::ScriptData => {
                 match char {
                     b'<' => self.state = States::ScriptDataLessThanSign,
@@ -194,13 +200,14 @@ impl<'stream> Tokenizer<'stream> {
                         self.builder.tag.name.push(&0xFD);
                     },
                     _ => {
-                        self.builder.set_variant(TokenVariant::Character);
+                        self.builder.set_variant(TokenVariant::Character)?;
                         self.builder.buffer.push(char);
                         self.tokens.push(self.builder.build());
                         self.builder = TokenBuilder::default();
                     }
                 }
             },
+
             States::PlainText => {
                 match char {
                     b'\0' => {
@@ -209,13 +216,14 @@ impl<'stream> Tokenizer<'stream> {
                         self.builder.tag.name.push(&0xFD);
                     },
                     _ => {
-                        self.builder.set_variant(TokenVariant::Character);
+                        self.builder.set_variant(TokenVariant::Character)?;
                         self.builder.buffer.push(char);
                         self.tokens.push(self.builder.build());
                         self.builder = TokenBuilder::default();
                     }
                 }
             },
+
             //https://html.spec.whatwg.org/multipage/parsing.html#tag-open-state
             States::TagOpen => {
                 match char {
@@ -243,6 +251,7 @@ impl<'stream> Tokenizer<'stream> {
                     }
                 }
             },
+
             States::EndTagOpen => {
                 match char {
                     b'a'..=b'z' | b'A'..=b'Z' => {
@@ -262,10 +271,11 @@ impl<'stream> Tokenizer<'stream> {
                     }
                 }
             },
+            
             States::TagName => {
                 match char {
                     b'\t' |
-                    0x0A /* LF */ |
+                    b'\n'/* LF */ |
                     0x0C /* FF */ |
                     b' ' => { self.state = States::BeforeAttributeName; },
                     b'/' => { self.state = States::SelfClosingStartTag; },
@@ -288,17 +298,124 @@ impl<'stream> Tokenizer<'stream> {
                     },
                 }
             },
+
             States::BeforeAttributeName => {
-
+                match char {
+                    b'\t' |
+                    b'\n'/* LF */ |
+                    0x0C /* FF */ |
+                    b' ' => { },
+                    b'/' |
+                    b'>' => {
+                        self.state = States::AfterAttributeName;
+                        self.stream.reconsume();
+                    },
+                    b'=' => {
+                        // TODO: unexpected-equqls-sign-before-attribute-name error
+                        self.builder.buffer.push(char);
+                        self.state = States::AttributeName;
+                    },
+                    _ => {
+                        self.state = States::AttributeName;
+                        self.stream.reconsume();
+                    }
+                }
             },
-            States::AttributeName => {
 
+            States::AttributeName => {
+                match char {
+                    b'\t' |
+                    b'\n'/* LF */ |
+                    0x0C /* FF */ |
+                    b' ' => { },
+                    b'/' |
+                    b'>' => {
+                        self.state = States::AfterAttributeName;
+                        self.stream.reconsume();
+                    },
+                    b'=' => {
+                        // TODO: put the value name in, reset buffer
+                        self.state = States::BeforeAttributeValue;
+                    },
+                    b'A'..=b'Z' => {
+                        self.builder.buffer.push(char);
+                    },
+                    b'\0' => {
+                        // TODO: unexpected-null-character error
+                        self.builder.buffer.push(&0xFF);
+                        self.builder.buffer.push(&0xFD);
+                    },
+                    b'\''|
+                    b'"' |
+                    b'<' => {
+                        // TODO: unexpected-character-in-attribute-name errorname
+                        self.builder.buffer.push(char);
+                    },
+                    _ => {
+                        self.builder.buffer.push(char);
+                    }
+                }
+            },
+
+            States::BeforeAttributeName => {
             },
             States::AfterAttributeName => {
             },
-            States::BeforeAttributeName => {
+            States::BeforeAttributeValue => {
+                match char {
+                    b'\t' |
+                    b'\n'/* LF */ |
+                    0x0C /* FF */ |
+                    b' ' => {  },
+                    b'"' => self.state = States::AttributeValueDoubleQuoted,
+                    b'\'' => self.state = States::AttributeValueSingleQuoted,
+                    b'>' => {
+                        // TODO: missing-attribute-value error
+                        self.state = States::Data;
+                        self.tokens.push(self.builder.build());
+                        self.builder = TokenBuilder::default();
+                    },
+                    _ => {
+                        self.state = States::AttributeValueUnquoted;
+                        self.stream.reconsume();
+                    }
+                }
             },
-
+            States::AttributeValueDoubleQuoted => {
+                match char {
+                    b'"' => self.state = States::AfterAttributeValueQuoted,
+                    b'&' => {
+                        self.return_state = States::AttributeValueDoubleQuoted;
+                        self.state = States::CharacterReference;
+                    },
+                    b'\0' => {
+                        // TODO: unexpected-null-character error
+                        self.builder.buffer.push(&0xFF);
+                        self.builder.buffer.push(&0xFD);
+                    },
+                    _ => self.builder.buffer.push(char)
+                }
+            }
+            States::AfterAttributeValueQuoted => {
+                match char {
+                    b'\t' |
+                    b'\n'/* LF */ |
+                    0x0C /* FF */ |
+                    b' ' => self.state = States::BeforeAttributeName,
+                    b'/' => self.state = States::SelfClosingStartTag,
+                    b'>' => {
+                        self.state = States::Data;
+                        // TODO: actually put the darn value in !
+                        self.tokens.push(self.builder.build());
+                        self.builder = TokenBuilder::default();
+                    },
+                    _ => {
+                        // TODO: missing-whitespace-between-attributes error
+                        self.state = States::BeforeAttributeName;
+                        self.stream.reconsume();
+                    }
+                }
+            }
             _ => todo!(),
         }
         Ok(())

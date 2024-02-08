@@ -97,7 +97,7 @@ pub struct Tokenizer<'stream> {
 }
 
 impl<'stream> Tokenizer<'stream> {
-    pub fn new(data: &'stream [u8]) -> Self {
+    pub fn new(data: &'stream Vec<u8>) -> Self {
         Self {
             stream: Stream::new(data),
             state: States::Data,
@@ -136,17 +136,86 @@ impl<'stream> Tokenizer<'stream> {
                     },
                     b'\0' => {
                         // TODO: log unexpected-null-character error
-                        self.tokens.push(Token::Character(char));
+                        self.builder.set_variant(TokenVariant::Character);
+                        self.builder.buffer.push(char);
+                        self.tokens.push(self.builder.build());
+                        self.builder = TokenBuilder::default();
                     },
                     _ => {
-                        self.tokens.push(Token::Character(char));
+                        self.builder.set_variant(TokenVariant::Character);
+                        self.builder.buffer.push(char);
+                        self.tokens.push(self.builder.build());
+                        self.builder = TokenBuilder::default();
                     }
                 }
             },
-            States::RCData => todo!(),
-            States::RawText => todo!(),
-            States::ScriptData => todo!(),
-            States::PlainText => todo!(),
+            States::RCData => {
+                match char {
+                    b'&' => {
+                        self.return_state = States::RCData;
+                        self.state = States::CharacterReference;
+                    },
+                    b'<' => self.state = States::RCDataLessThanSign,
+                    b'\0' => {
+                        // TODO: unexpected-null-character error
+                        self.builder.tag.name.push(&0xFF);
+                        self.builder.tag.name.push(&0xFD);
+                    },
+                    _ => {
+                        self.builder.set_variant(TokenVariant::Character);
+                        self.builder.buffer.push(char);
+                        self.tokens.push(self.builder.build());
+                        self.builder = TokenBuilder::default();
+                    }
+                }
+            },
+            States::RawText => {
+                match char {
+                    b'<' => self.state = States::RawTextLessThanSign,
+                    b'\0' => {
+                        // TODO: unexpected-null-character error
+                        self.builder.tag.name.push(&0xFF);
+                        self.builder.tag.name.push(&0xFD);
+                    },
+                    _ => {
+                        self.builder.set_variant(TokenVariant::Character);
+                        self.builder.buffer.push(char);
+                        self.tokens.push(self.builder.build());
+                        self.builder = TokenBuilder::default();
+                    }
+                }
+            },
+            States::ScriptData => {
+                match char {
+                    b'<' => self.state = States::ScriptDataLessThanSign,
+                    b'\0' => {
+                        // TODO: unexpected-null-character error
+                        self.builder.tag.name.push(&0xFF);
+                        self.builder.tag.name.push(&0xFD);
+                    },
+                    _ => {
+                        self.builder.set_variant(TokenVariant::Character);
+                        self.builder.buffer.push(char);
+                        self.tokens.push(self.builder.build());
+                        self.builder = TokenBuilder::default();
+                    }
+                }
+            },
+            States::PlainText => {
+                match char {
+                    b'\0' => {
+                        // TODO: unexpected-null-character error
+                        self.builder.tag.name.push(&0xFF);
+                        self.builder.tag.name.push(&0xFD);
+                    },
+                    _ => {
+                        self.builder.set_variant(TokenVariant::Character);
+                        self.builder.buffer.push(char);
+                        self.tokens.push(self.builder.build());
+                        self.builder = TokenBuilder::default();
+                    }
+                }
+            },
             //https://html.spec.whatwg.org/multipage/parsing.html#tag-open-state
             States::TagOpen => {
                 match char {
@@ -219,6 +288,17 @@ impl<'stream> Tokenizer<'stream> {
                     },
                 }
             },
+            States::BeforeAttributeName => {
+
+            },
+            States::AttributeName => {
+
+            },
+            States::AfterAttributeName => {
+            },
+            States::BeforeAttributeName => {
+            },
+
             _ => todo!(),
         }
         Ok(())

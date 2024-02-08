@@ -1,10 +1,10 @@
 pub struct Stream<'stream> {
-    pub data: &'stream [u8],
+    pub data: &'stream Vec<u8>,
     idx: usize,
 }
 
 impl<'stream> Stream<'stream> {
-    pub fn new(data: &'stream[u8]) -> Self {
+    pub fn new(data: &'stream Vec<u8>) -> Self {
         Stream {
             data,
             idx: 0

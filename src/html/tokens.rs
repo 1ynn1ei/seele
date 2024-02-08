@@ -1,8 +1,60 @@
-use std::collections::HashMap;
+use std::{mem, collections::HashMap};
+
 pub type RefBuffer<'stream, T> = Vec<&'stream T>;
 
 #[derive(Debug)]
-pub enum Tokens<'stream> {
+pub enum TokenVariant {
+    Doctype,
+    StartTag,
+    EndTag,
+    Comment,
+    Character,
+    EndOfFile
+}
+
+pub struct TokenBuilder<'stream> {
+    variant: TokenVariant,
+    pub doctype: DocType<'stream>,
+    pub tag: Tag<'stream>,
+    pub buffer: RefBuffer<'stream, u8>,
+}
+
+impl<'stream> TokenBuilder<'stream> {
+    pub fn new(variant: TokenVariant) -> Self {
+        Self {
+            variant,
+            doctype: DocType::default(),
+            tag: Tag::default(),
+            buffer: RefBuffer::default(),
+        }
+    }
+
+    pub fn build(&mut self) -> Token<'stream> {
+        match self.variant {
+            TokenVariant::Doctype => {
+                Token::Doctype(mem::take(&mut self.doctype))
+            },
+            TokenVariant::StartTag => {
+                Token::StartTag(mem::take(&mut self.tag))
+            },
+            TokenVariant::EndTag => {
+                Token::EndTag(mem::take(&mut self.tag))
+            },
+            TokenVariant::Comment => {
+                Token::Comment(mem::take(&mut self.buffer))
+            },
+            TokenVariant::Character => {
+                Token::Character(self.buffer.pop().unwrap())
+            },
+            TokenVariant::EndOfFile => {
+                Token::EndOfFile
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum Token<'stream> {
     Doctype(DocType<'stream>),
     StartTag(Tag<'stream>),
     EndTag(Tag<'stream>),
@@ -22,8 +74,8 @@ pub struct DocType<'stream> {
     force_quirks: bool,
 }
 
-impl<'stream> DocType<'stream> {
-    pub fn new() -> Self {
+impl<'stream> Default for DocType<'stream> {
+    fn default() -> Self {
         Self {
             name: RefBuffer::new(),
             public_id: RefBuffer::new(),
@@ -42,18 +94,12 @@ pub struct Tag<'stream> {
     attributes: AttrMap<'stream>
 }
 
-impl<'stream> Tag<'stream> {
-    pub fn new() -> Self {
+impl<'stream> Default for Tag<'stream> {
+    fn default() -> Self {
         Self {
             name: RefBuffer::new(),
             self_closing: false, 
             attributes: AttrMap::new(),
         }
     }
-
-    pub fn set_name(&mut self, data: RefBuffer<'stream, u8>) {
-        self.name = data;
-    }
 }
-
-

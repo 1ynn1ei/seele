@@ -1,8 +1,8 @@
-use crate::html::tokens::{Tokens, Tag, RefBuffer};
+use crate::html::tokens::{Token, Tag, RefBuffer};
 use crate::stream::Stream;
 const LOWERCASE_OFFSET : u8 = 0x0020;
 
-pub type TokenList<'stream> = Vec<Tokens<'stream>>;
+pub type TokenList<'stream> = Vec<Token<'stream>>;
 pub enum States {
     Data,
     RCData,
@@ -100,7 +100,7 @@ pub struct Tokenizer<'stream> {
     return_state: States,
     tokens: TokenList<'stream>,
     buffer: RefBuffer<'stream, u8>,
-    buffered_token: Option<Tokens<'stream>>,
+    buffered_token: Option<Token<'stream>>,
 }
 
 impl<'stream> Tokenizer<'stream> {
@@ -115,7 +115,7 @@ impl<'stream> Tokenizer<'stream> {
         }
     }
 
-    fn prepare_buffer(&mut self, token: Tokens<'stream>) -> Result<(), TokenizerError> {
+    fn prepare_buffer(&mut self, token: Token<'stream>) -> Result<(), TokenizerError> {
         match self.buffered_token {
             Some(_) => {
                 Err(TokenizerError::BufferPreparationConflict)
@@ -164,7 +164,7 @@ impl<'stream> Tokenizer<'stream> {
         loop {
             if self.stream.is_eof() {
                 // if EOF, go into EOF handler. some states create errors
-                self.tokens.push(Tokens::EndOfFile);
+                self.tokens.push(Token::EndOfFile);
                 return Ok(&self.tokens);
             } else {
                 let char = self.stream.current();
@@ -197,10 +197,10 @@ impl<'stream> Tokenizer<'stream> {
             },
             b'\0' => {
                 // TODO: log unexpected-null-character error
-                self.tokens.push(Tokens::Character(char));
+                self.tokens.push(Token::Character(char));
             },
             _ => {
-                self.tokens.push(Tokens::Character(char));
+                self.tokens.push(Token::Character(char));
             }
         }
         Ok(())
@@ -217,18 +217,18 @@ impl<'stream> Tokenizer<'stream> {
             },
             b'?' => {
                 self.state = States::BogusComment;
-                // self.prepare_buffer(Tokens::Comment(RefBuffer::new()))?;
+                // self.prepare_buffer(Token::Comment(RefBuffer::new()))?;
                 self.stream.reconsume();
             },
             b'a'..=b'z' | b'A'..=b'Z' => {
                 self.state = States::TagName;
-                // self.prepare_buffer(Tokens::StartTag(Tag::new()))?;
+                // self.prepare_buffer(Token::StartTag(Tag::new()))?;
                 self.stream.reconsume();
             },
             _ => {
                 // TODO: invalid-first-character-of-tag-name error
                 self.state = States::Data;
-                // self.tokens.push(Tokens::Character(&b'<'));
+                // self.tokens.push(Token::Character(&b'<'));
                 self.stream.reconsume();
             }
         }
@@ -240,7 +240,7 @@ impl<'stream> Tokenizer<'stream> {
         match char {
             b'a'..=b'z' | b'A'..=b'Z' => {
                 self.state = States::TagName;
-                self.prepare_buffer(Tokens::EndTag(Tag::new()))?;
+                self.prepare_buffer(Token::EndTag(Tag::new()))?;
                 self.stream.reconsume();
             },
             b'>' => {
@@ -250,7 +250,7 @@ impl<'stream> Tokenizer<'stream> {
             _ => {
                 // TODO: invalid-first-character-of-tag-name error
                 self.state = States::BogusComment;
-                self.prepare_buffer(Tokens::Comment(RefBuffer::new()))?;
+                self.prepare_buffer(Token::Comment(RefBuffer::new()))?;
                 self.stream.reconsume();
             }
         }

@@ -1,4 +1,5 @@
 use std::{mem, collections::HashMap};
+use crate::html::HTMLError;
 
 pub type RefBuffer<'stream, T> = Vec<&'stream T>;
 
@@ -9,28 +10,31 @@ pub enum TokenVariant {
     EndTag,
     Comment,
     Character,
-    EndOfFile
+    EndOfFile,
 }
 
+#[derive(Default)]
 pub struct TokenBuilder<'stream> {
-    variant: TokenVariant,
+    variant: Option<TokenVariant>,
     pub doctype: DocType<'stream>,
     pub tag: Tag<'stream>,
     pub buffer: RefBuffer<'stream, u8>,
 }
 
 impl<'stream> TokenBuilder<'stream> {
-    pub fn new(variant: TokenVariant) -> Self {
-        Self {
-            variant,
-            doctype: DocType::default(),
-            tag: Tag::default(),
-            buffer: RefBuffer::default(),
+    pub fn set_variant(&mut self, variant: TokenVariant) -> Result<(), HTMLError> {
+        match self.variant {
+            Some(_) => Err(HTMLError::TokenBuilderImproperlyCleared),
+            None => {
+                self.variant = Some(variant);
+                Ok(())
+            }
         }
     }
 
     pub fn build(&mut self) -> Token<'stream> {
-        match self.variant {
+        // TODO: we need to properly handle error here! lol 
+        match self.variant.as_mut().unwrap() {
             TokenVariant::Doctype => {
                 Token::Doctype(mem::take(&mut self.doctype))
             },
@@ -66,7 +70,7 @@ pub enum Token<'stream> {
 
 
 //https://html.spec.whatwg.org/multipage/parsing.html#tokenization
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct DocType<'stream> {
     name: RefBuffer<'stream, u8>,
     public_id: RefBuffer<'stream, u8>,
@@ -74,32 +78,12 @@ pub struct DocType<'stream> {
     force_quirks: bool,
 }
 
-impl<'stream> Default for DocType<'stream> {
-    fn default() -> Self {
-        Self {
-            name: RefBuffer::new(),
-            public_id: RefBuffer::new(),
-            system_id: RefBuffer::new(),
-            force_quirks: false,
-        }
-    }
-}
-
 pub type AttrMap<'stream> = HashMap<RefBuffer<'stream, u8>, RefBuffer<'stream, u8>>;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Tag<'stream> {
-    name: RefBuffer<'stream, u8>,
-    self_closing: bool,
-    attributes: AttrMap<'stream>
+    pub name: RefBuffer<'stream, u8>,
+    pub self_closing: bool,
+    pub attributes: AttrMap<'stream>
 }
 
-impl<'stream> Default for Tag<'stream> {
-    fn default() -> Self {
-        Self {
-            name: RefBuffer::new(),
-            self_closing: false, 
-            attributes: AttrMap::new(),
-        }
-    }
-}

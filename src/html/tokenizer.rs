@@ -1,8 +1,6 @@
-use crate::html::tokens::{Tokens, Tag};
+use crate::html::tokens::{Tokens, Tag, RefBuffer};
 use crate::stream::Stream;
-
 const LOWERCASE_OFFSET : u8 = 0x0020;
-const REPLACEMENT_CHARACTER : u8 = 0xFFFD;
 
 pub type TokenList<'stream> = Vec<Tokens<'stream>>;
 pub enum States {
@@ -89,23 +87,20 @@ pub enum States {
 
 #[derive(Debug)]
 pub enum TokenizerError {
-    WorkingTokenCollision,
-    WorkingTokenUnexpectedEmpty,
-    WorkingTokenEmptyCommit,
+    BufferPreparationConflict,
+    BufferUnexpectedEmptyClear,
+    BufferEmptyCommit,
+    NamingOfNonTagToken,
 }
 
-#[derive(Default)]
-pub struct WorkingToken<'stream> {
-    token: Option<Tokens<'stream>>,
-    value: Vec<&'stream u8>
-}
 
 pub struct Tokenizer<'stream> {
     stream: Stream<'stream>,
     state: States,
     return_state: States,
     tokens: TokenList<'stream>,
-    working_token: WorkingToken<'stream>,
+    buffer: RefBuffer<'stream, u8>,
+    buffered_token: Option<Tokens<'stream>>,
 }
 
 impl<'stream> Tokenizer<'stream> {
@@ -115,43 +110,52 @@ impl<'stream> Tokenizer<'stream> {
             state: States::Data,
             return_state: States::Data,
             tokens: TokenList::new(),
-            working_token: WorkingToken::default()
+            buffer: RefBuffer::new(),
+            buffered_token: None,
         }
     }
 
-    fn prepare_working_token(&mut self, token: Tokens) -> Result<(), TokenizerError> {
-        match self.working_token.token {
-            Some(_) => Err(TokenizerError::WorkingTokenCollision),
+    fn prepare_buffer(&mut self, token: Tokens<'stream>) -> Result<(), TokenizerError> {
+        match self.buffered_token {
+            Some(_) => {
+                Err(TokenizerError::BufferPreparationConflict)
+            },
             None => {
-                self.working_token.token = Some(token);
+                self.buffered_token = Some(token);
+                self.buffer = RefBuffer::new();
                 Ok(())
             }
         }
     }
 
-    fn clear_working_token(&mut self) -> Result<(), TokenizerError> {
-        match self.working_token.token {
+    fn clear_buffer(&mut self) -> Result<(), TokenizerError> {
+        match self.buffered_token {
             Some(_) => {
-                self.working_token.token = None;
-                self.working_token.value = Vec::new();
+                self.buffered_token = None;
+                self.buffer = RefBuffer::new();
                 Ok(())
             },
-            None => Err(TokenizerError::WorkingTokenUnexpectedEmpty)
+            None => {
+                Err(TokenizerError::BufferUnexpectedEmptyClear)
+            }
         }
     }
 
-    fn push_working_token(&mut self, char: &'stream u8) {
-        self.working_token.value.push(char);
+    fn push_to_buffer(&mut self, char: &'stream u8) {
+        self.buffer.push(char);
     }
 
-    fn commit_working_token(&mut self) -> Result<(), TokenizerError> {
-        match &self.working_token.token {
-            Some(token) => {
-                // self.tokens.push(token);
-                self.clear_working_token()?;
-                Ok(())
+    fn commit_buffer(&mut self) -> Result<RefBuffer<'stream, u8>, TokenizerError> {
+        match &self.buffered_token {
+            Some(_) => {
+                // TODO: this whole pattern is an absolute mess. clean it
+                let slice = self.buffer.clone();
+                self.buffer = RefBuffer::new(); 
+                Ok(slice)
             },
-            None => Err(TokenizerError::WorkingTokenEmptyCommit)
+            None => {
+                Err(TokenizerError::BufferEmptyCommit)
+            }
         }
     }
 
@@ -213,18 +217,18 @@ impl<'stream> Tokenizer<'stream> {
             },
             b'?' => {
                 self.state = States::BogusComment;
-                self.prepare_working_token(Tokens::Comment(&[]));
+                // self.prepare_buffer(Tokens::Comment(RefBuffer::new()))?;
                 self.stream.reconsume();
             },
             b'a'..=b'z' | b'A'..=b'Z' => {
                 self.state = States::TagName;
-                self.prepare_working_token(Tokens::StartTag(Tag::new()));
+                // self.prepare_buffer(Tokens::StartTag(Tag::new()))?;
                 self.stream.reconsume();
             },
             _ => {
                 // TODO: invalid-first-character-of-tag-name error
                 self.state = States::Data;
-                self.tokens.push(Tokens::Character(&b'<'));
+                // self.tokens.push(Tokens::Character(&b'<'));
                 self.stream.reconsume();
             }
         }
@@ -236,7 +240,7 @@ impl<'stream> Tokenizer<'stream> {
         match char {
             b'a'..=b'z' | b'A'..=b'Z' => {
                 self.state = States::TagName;
-                self.prepare_working_token(Tokens::EndTag(Tag::new()));
+                self.prepare_buffer(Tokens::EndTag(Tag::new()))?;
                 self.stream.reconsume();
             },
             b'>' => {
@@ -246,7 +250,7 @@ impl<'stream> Tokenizer<'stream> {
             _ => {
                 // TODO: invalid-first-character-of-tag-name error
                 self.state = States::BogusComment;
-                self.prepare_working_token(Tokens::Comment(&[]));
+                self.prepare_buffer(Tokens::Comment(RefBuffer::new()))?;
                 self.stream.reconsume();
             }
         }
@@ -263,18 +267,19 @@ impl<'stream> Tokenizer<'stream> {
             b'/' => { self.state = States::SelfClosingStartTag; },
             b'>' => {
                 self.state = States::Data;
-                self.commit_working_token()?;
+                // TODO: actually emit here
             },
             b'A'..=b'Z' => {
                 // TODO: handle lowercasing of tags during the tree creation
-                self.push_working_token(&(char));
+                // self.push_to_buffer(char);
             },
             b'\0' => {
                 // TODO: unexpected-null-character error
-                self.push_working_token(&REPLACEMENT_CHARACTER);
+                // self.push_to_buffer(&0xFF);
+                // self.push_to_buffer(&0xFD);
             },
             _ => {
-                self.push_working_token(char);
+                // self.push_to_buffer(char);
             },
         }
         Ok(())

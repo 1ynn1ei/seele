@@ -1,11 +1,12 @@
 use std::collections::HashMap;
+pub type RefBuffer<'stream, T> = Vec<&'stream T>;
 
 #[derive(Debug)]
 pub enum Tokens<'stream> {
     Doctype(DocType<'stream>),
     StartTag(Tag<'stream>),
     EndTag(Tag<'stream>),
-    Comment(&'stream [u8]),
+    Comment(RefBuffer<'stream, u8>),
     Character(&'stream u8),
     EndOfFile,
 }
@@ -15,28 +16,28 @@ pub enum Tokens<'stream> {
 //https://html.spec.whatwg.org/multipage/parsing.html#tokenization
 #[derive(Debug)]
 pub struct DocType<'stream> {
-    name: Option<&'stream [u8]>,
-    public_id: Option<&'stream [u8]>,
-    system_id: Option<&'stream [u8]>,
+    name: RefBuffer<'stream, u8>,
+    public_id: RefBuffer<'stream, u8>,
+    system_id: RefBuffer<'stream, u8>,
     force_quirks: bool,
 }
 
 impl<'stream> DocType<'stream> {
     pub fn new() -> Self {
         Self {
-            name: None,
-            public_id: None,
-            system_id: None,
+            name: RefBuffer::new(),
+            public_id: RefBuffer::new(),
+            system_id: RefBuffer::new(),
             force_quirks: false,
         }
     }
 }
 
-pub type AttrMap<'stream> = HashMap<&'stream [u8], &'stream [u8]>;
+pub type AttrMap<'stream> = HashMap<RefBuffer<'stream, u8>, RefBuffer<'stream, u8>>;
 
 #[derive(Debug)]
 pub struct Tag<'stream> {
-    name: Option<&'stream [u8]>,
+    name: RefBuffer<'stream, u8>,
     self_closing: bool,
     attributes: AttrMap<'stream>
 }
@@ -44,14 +45,14 @@ pub struct Tag<'stream> {
 impl<'stream> Tag<'stream> {
     pub fn new() -> Self {
         Self {
-            name: None,
+            name: RefBuffer::new(),
             self_closing: false, 
             attributes: AttrMap::new(),
         }
     }
 
-    pub fn set_name(&mut self, data: &'stream [u8]) {
-        self.name = Some(data);
+    pub fn set_name(&mut self, data: RefBuffer<'stream, u8>) {
+        self.name = data;
     }
 }
 

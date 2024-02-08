@@ -1,4 +1,3 @@
-
 pub struct Stream<'stream> {
     pub data: &'stream [u8],
     idx: usize,

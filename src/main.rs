@@ -10,7 +10,7 @@ fn main() {
     match tokenizer.make_tokens() {
         Ok(res) => {
             for token in res {
-                println!("{:?}", token);
+                println!("{:?}", token.present());
             }
         },
         Err(err) => {

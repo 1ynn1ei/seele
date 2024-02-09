@@ -1,4 +1,4 @@
-use std::{mem, collections::HashMap};
+use std::mem;
 use crate::html::HTMLError;
 
 #[derive(Debug)]
@@ -63,6 +63,7 @@ impl<'stream> TokenBuilder<'stream> {
     }
 }
 
+
 #[derive(Debug)]
 pub enum Token<'stream> {
     Doctype(DocType<'stream>),
@@ -71,6 +72,61 @@ pub enum Token<'stream> {
     Comment(Vec<&'stream u8>),
     Character(&'stream u8),
     EndOfFile,
+}
+
+impl<'stream> Token<'stream> {
+
+    fn printer_hepler(&self, data: &[&'stream u8]) -> String {
+        String::from_utf8(data
+            .iter()
+            .map(|&x| *x)
+            .collect()).unwrap()
+    }
+
+    pub fn present(&self) -> String {
+        match self {
+            Self::EndOfFile => String::from("EOF"),
+            Self::Comment(data) => self.printer_hepler(data),
+            Self::Character(byte) => {
+                self.printer_hepler(&[*byte])
+            },
+            Self::EndTag(tag) |
+            Self::StartTag(tag) => {
+                let mut fmt_str = String::new();
+                match self {
+                    Self::EndTag(_) => fmt_str.push_str("EndTag: "),
+                    Self::StartTag(_) => fmt_str.push_str("StartTag: "),
+                    _ => {}
+                }
+                fmt_str.push_str(&self.printer_hepler(&tag.name));
+                fmt_str.push('[');
+                for i in 0..tag.attr_keys.len() {
+                    fmt_str.push(' ');
+                    let key = tag.attr_keys.get(i).unwrap();
+                    let key_str = String::from_utf8(key
+                                .iter()
+                                .map(|&x| *x)
+                                .collect()).unwrap();
+                    fmt_str.push_str(&key_str);
+                    fmt_str.push_str(": ");
+                    match tag.attr_values.get(i) {
+                        Some(bytes) => {
+                            fmt_str.push_str(&String::from_utf8(bytes
+                                        .iter()
+                                        .map(|&x| *x)
+                                        .collect()).unwrap());
+                        },
+                        None => {
+                            fmt_str.push_str("EMPTY");
+                        }
+                    }
+                }
+                fmt_str.push(']');
+                fmt_str
+            }
+            _ => String::from("TBD")
+        }
+    }
 }
 
 //https://html.spec.whatwg.org/multipage/parsing.html#tokenization

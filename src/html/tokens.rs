@@ -30,6 +30,14 @@ impl<'stream> TokenBuilder<'stream> {
         }
     }
 
+    pub fn commit_buffer_to_attr_keys(&mut self) {
+        self.tag.attr_keys.push(mem::take(&mut self.buffer));
+    }
+
+    pub fn commit_buffer_to_attr_value(&mut self) {
+        self.tag.attr_values.push(mem::take(&mut self.buffer));
+    }
+
     pub fn build(&mut self) -> Token<'stream> {
         // TODO: we need to properly handle error here! lol 
         match self.variant.as_mut().unwrap() {

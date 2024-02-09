@@ -112,7 +112,6 @@ impl<'stream> Tokenizer<'stream> {
     pub fn make_tokens(&mut self) -> Result<&TokenList<'stream>, HTMLError> {
         // check EOF before rest
         loop {
-            println!("{:?}", self.state);
             if self.stream.is_eof() {
                 // if EOF, go into EOF handler. some states create errors
                 self.tokens.push(Token::EndOfFile);
@@ -334,7 +333,7 @@ impl<'stream> Tokenizer<'stream> {
                         self.stream.reconsume();
                     },
                     b'=' => {
-                        // TODO: put the value name in, reset buffer
+                        self.builder.commit_buffer_to_attr_keys();
                         self.state = States::BeforeAttributeValue;
                     },
                     b'A'..=b'Z' => {
@@ -383,7 +382,10 @@ impl<'stream> Tokenizer<'stream> {
             },
             States::AttributeValueDoubleQuoted => {
                 match char {
-                    b'"' => self.state = States::AfterAttributeValueQuoted,
+                    b'"' => {
+                        self.state = States::AfterAttributeValueQuoted;
+                        self.builder.commit_buffer_to_attr_value();
+                    },
                     b'&' => {
                         self.return_state = States::AttributeValueDoubleQuoted;
                         self.state = States::CharacterReference;
@@ -405,7 +407,6 @@ impl<'stream> Tokenizer<'stream> {
                     b'/' => self.state = States::SelfClosingStartTag,
                     b'>' => {
                         self.state = States::Data;
-                        // TODO: actually put the darn value in !
                         self.tokens.push(self.builder.build());
                         self.builder = TokenBuilder::default();
                     },

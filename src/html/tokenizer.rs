@@ -7,6 +7,7 @@ const LOWERCASE_OFFSET : u8 = 0x0020;
 
 pub type TokenList<'stream> = Vec<Token<'stream>>;
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum States {
     Data,
     RCData,
@@ -117,6 +118,7 @@ impl<'stream> Tokenizer<'stream> {
                 self.tokens.push(Token::EndOfFile);
                 return Ok(&self.tokens);
             } else {
+                println!("{:?}", self.state);
                 self.run_state()?;
             }
         }
@@ -126,6 +128,7 @@ impl<'stream> Tokenizer<'stream> {
         let char = self.stream.current();
         self.stream.advance();
         match self.state {
+
             //https://html.spec.whatwg.org/multipage/parsing.html#data-state
             States::Data => {
                 match char {

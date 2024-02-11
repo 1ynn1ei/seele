@@ -7,3 +7,18 @@ pub mod tokenizer;
 pub enum HTMLError {
     TokenBuilderImproperlyCleared
 }
+
+pub fn make_dom(data: &Vec<u8>) -> Result<(), HTMLError> {
+    let mut tokenizer = tokenizer::Tokenizer::new(data);
+    let mut parser = parser::Parser::new();
+    loop {
+        let next_emit : Option<tokens::Token>  = tokenizer.get_next_token()?;
+        if let Some(token) = next_emit {
+            match token {
+                tokens::Token::EndOfFile => break,
+                _ => parser.parse_token(token),
+            }
+        }
+    }
+    Ok(())
+}

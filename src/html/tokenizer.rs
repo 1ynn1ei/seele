@@ -110,21 +110,16 @@ impl<'stream> Tokenizer<'stream> {
         }
     }
 
-    pub fn make_tokens(&mut self) -> Result<&TokenList<'stream>, HTMLError> {
-        // check EOF before rest
-        loop {
-            if self.stream.is_eof() {
-                // if EOF, go into EOF handler. some states create errors
-                self.tokens.push(Token::EndOfFile);
-                return Ok(&self.tokens);
-            } else {
-                println!("{:?}", self.state);
-                self.run_state()?;
-            }
+    pub fn get_next_token(&mut self) -> Result<Option<Token>, HTMLError> {
+        if self.stream.is_eof() {
+            // TODO: we need to handle EOF differnet for some states
+            return Ok(Some(Token::EndOfFile));
+        } else {
+            self.run_state()
         }
     }
 
-    pub fn run_state(&mut self) -> Result<(), HTMLError> {
+    pub fn run_state(&mut self) -> Result<Option<Token>, HTMLError> {
         let char = self.stream.current();
         self.stream.advance();
         match self.state {
@@ -422,6 +417,6 @@ impl<'stream> Tokenizer<'stream> {
             }
             _ => todo!(),
         }
-        Ok(())
+        Ok(None)
     }
 }

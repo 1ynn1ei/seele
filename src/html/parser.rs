@@ -1,3 +1,8 @@
+use crate::html::{
+    tokens::Token,
+    dom
+};
+
 pub enum Mode {
     Initial,
     BeforeHtml,
@@ -29,5 +34,13 @@ pub struct Parser {
 }
 
 impl Parser {
+    pub fn new() -> Self {
+        Self {
+            template_insertion_modes: Vec::new()
+        }
+    }
 
+    pub fn parse_token(&mut self, token: Token) {
+
+    }
 }

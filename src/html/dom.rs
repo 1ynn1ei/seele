@@ -4,6 +4,12 @@ pub enum Node {
     Element,
     Text
 }
+pub struct Document {
+    title: String,
+    dir: String,
+    body: Option<Element>,
+    head: Option<Element>,
+}
 
 pub struct Element {
     namespace_uri: Option<String>,

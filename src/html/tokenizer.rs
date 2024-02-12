@@ -115,6 +115,7 @@ impl<'stream> Tokenizer<'stream> {
             // TODO: we need to handle EOF differnet for some states
             return Ok(Some(Token::EndOfFile));
         } else {
+            println!("{:?}", self.state);
             self.run_state()
         }
     }
@@ -415,6 +416,56 @@ impl<'stream> Tokenizer<'stream> {
                     }
                 }
             }
+
+            // AfterAttributeValueQuoted,
+            // SelfClosingStartTag,
+            // BogusComment,
+            States::MarkupDeclarationOpen => {
+                match char {
+                    b'-' => {
+                        if self.stream.expect("-") {
+                            self.stream.consume("--");
+                            self.state = States::Comment;
+                        } else {
+                            todo!()
+                        }
+                    },
+                    b'd' | b'D' => {
+                        if self.stream.expect("OCTYPE") {
+                            self.stream.consume("doctype");
+                            self.state = States::DocType;
+                        } else {
+                            todo!()
+                        }
+                    },
+                    b'[' => {
+                        if self.stream.expect("CDATA[") {
+                            todo!()
+                        } else {
+                            todo!()
+                        }
+                    },
+                    _ => { todo!() }
+                }
+            },
+            States::DocType => {
+
+            },
+            // BeforeDocType,
+            // DocTypeName,
+            // AfterDocTypeName,
+            // AfterDocTypeNamePublicKeyword,
+            // BeforeDocTypePublicIdentifier,
+            // DocTypePublicIdentifierDoubleQuoted,
+            // DocTypePublicIdentifierSingleQuoted,
+            // AfterDocTypePublicIdentifier,
+            // BetweenDocTypePublicSystemIdentifiers,
+            // AfterDocTypeSystemKeyword,
+            // BeforeDocTypeSystemIdentifier,
+            // DocTypeSystemIdentifierDoubleQuoted,
+            // DocTypeSystemIdentifierSingleQuoted,
+            // AfterDocTypeSystemIdentifier,
+            // BogusDocType,
             _ => todo!(),
         }
         Ok(None)

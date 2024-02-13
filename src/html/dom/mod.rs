@@ -1,5 +1,9 @@
 mod documenttype;
+mod comment;
+
 pub use documenttype::DocumentType;
+pub use comment::Comment;
+
 #[derive(Default)]
 pub struct Node {
 

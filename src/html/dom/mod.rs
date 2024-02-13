@@ -1,9 +1,14 @@
-pub enum Node {
-    Document,
-    Doctype,
-    Element,
-    Text
+mod documenttype;
+pub use documenttype::DocumentType;
+#[derive(Default)]
+pub struct Node {
+
 }
+
+pub trait DomObject {
+
+}
+
 pub struct Document {
     title: String,
     dir: String,

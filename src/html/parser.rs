@@ -31,16 +31,17 @@ pub enum Mode {
 
 pub struct Parser {
     template_insertion_modes: Vec<Mode>,
+    open_elements: Vec<Box<dyn dom::DomObject>>,
 }
 
 impl Parser {
     pub fn new() -> Self {
         Self {
-            template_insertion_modes: Vec::new()
+            template_insertion_modes: Vec::new(),
+            open_elements: Vec::new(),
         }
     }
 
     pub fn parse_token(&mut self, token: Token) {
-
     }
 }

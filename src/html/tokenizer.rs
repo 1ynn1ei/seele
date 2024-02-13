@@ -401,6 +401,7 @@ impl<'stream> Tokenizer<'stream> {
                     },
                     b'>' => {
                         self.state = States::Data;
+                        self.builder.commit_buffer_to_attr_value();
                         return Ok(Some(self.builder.build()));
                     },
                     b'"' |

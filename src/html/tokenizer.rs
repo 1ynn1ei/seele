@@ -3,7 +3,6 @@ use crate::html::{
     HTMLError
 };
 use crate::stream::Stream;
-const LOWERCASE_OFFSET : u8 = 0x0020;
 
 pub type TokenList<'stream> = Vec<Token<'stream>>;
 #[derive(Debug)]
@@ -62,7 +61,7 @@ pub enum States {
     CommentEnd,
     CommentEndBang,
     DocType,
-    BeforeDocType,
+    BeforeDocTypeName,
     DocTypeName,
     AfterDocTypeName,
     AfterDocTypeNamePublicKeyword,
@@ -113,7 +112,7 @@ impl<'stream> Tokenizer<'stream> {
     pub fn get_next_token(&mut self) -> Result<Option<Token>, HTMLError> {
         if self.stream.is_eof() {
             // TODO: we need to handle EOF differnet for some states
-            return Ok(Some(Token::EndOfFile));
+            Ok(Some(Token::EndOfFile))
         } else {
             println!("{:?}", self.state);
             self.run_state()
@@ -139,14 +138,13 @@ impl<'stream> Tokenizer<'stream> {
                         // TODO: log unexpected-null-character error
                         self.builder.set_variant(TokenVariant::Character)?;
                         self.builder.buffer.push(char);
-                        self.tokens.push(self.builder.build());
-                        self.builder = TokenBuilder::default();
+                        return Ok(Some(self.builder.build()));
+
                     },
                     _ => {
                         self.builder.set_variant(TokenVariant::Character)?;
                         self.builder.buffer.push(char);
-                        self.tokens.push(self.builder.build());
-                        self.builder = TokenBuilder::default();
+                        return Ok(Some(self.builder.build()));
                     }
                 }
             },
@@ -166,8 +164,7 @@ impl<'stream> Tokenizer<'stream> {
                     _ => {
                         self.builder.set_variant(TokenVariant::Character)?;
                         self.builder.buffer.push(char);
-                        self.tokens.push(self.builder.build());
-                        self.builder = TokenBuilder::default();
+                        return Ok(Some(self.builder.build()));
                     }
                 }
             },
@@ -183,8 +180,7 @@ impl<'stream> Tokenizer<'stream> {
                     _ => {
                         self.builder.set_variant(TokenVariant::Character)?;
                         self.builder.buffer.push(char);
-                        self.tokens.push(self.builder.build());
-                        self.builder = TokenBuilder::default();
+                        return Ok(Some(self.builder.build()));
                     }
                 }
             },
@@ -200,8 +196,7 @@ impl<'stream> Tokenizer<'stream> {
                     _ => {
                         self.builder.set_variant(TokenVariant::Character)?;
                         self.builder.buffer.push(char);
-                        self.tokens.push(self.builder.build());
-                        self.builder = TokenBuilder::default();
+                        return Ok(Some(self.builder.build()));
                     }
                 }
             },
@@ -216,8 +211,7 @@ impl<'stream> Tokenizer<'stream> {
                     _ => {
                         self.builder.set_variant(TokenVariant::Character)?;
                         self.builder.buffer.push(char);
-                        self.tokens.push(self.builder.build());
-                        self.builder = TokenBuilder::default();
+                        return Ok(Some(self.builder.build()));
                     }
                 }
             },
@@ -279,8 +273,7 @@ impl<'stream> Tokenizer<'stream> {
                     b'/' => { self.state = States::SelfClosingStartTag; },
                     b'>' => {
                         self.state = States::Data;
-                        self.tokens.push(self.builder.build());
-                        self.builder = TokenBuilder::default();
+                        return Ok(Some(self.builder.build()));
                     },
                     b'A'..=b'Z' => {
                         // TODO: handle lowercasing of tags during the tree creation
@@ -370,8 +363,7 @@ impl<'stream> Tokenizer<'stream> {
                     b'>' => {
                         // TODO: missing-attribute-value error
                         self.state = States::Data;
-                        self.tokens.push(self.builder.build());
-                        self.builder = TokenBuilder::default();
+                        return Ok(Some(self.builder.build()));
                     },
                     _ => {
                         self.state = States::AttributeValueUnquoted;
@@ -397,6 +389,31 @@ impl<'stream> Tokenizer<'stream> {
                     _ => self.builder.buffer.push(char)
                 }
             }
+            States::AttributeValueUnquoted => {
+                match char {
+                    b'\t' |
+                    b'\n'/* LF */ |
+                    0x0C /* FF */ |
+                    b' ' => self.state = States::BeforeAttributeName,
+                    b'&' => {
+                        self.return_state = States::AttributeValueUnquoted;
+                        self.state = States::CharacterReference;
+                    },
+                    b'>' => {
+                        self.state = States::Data;
+                        return Ok(Some(self.builder.build()));
+                    },
+                    b'"' |
+                    b'\''|
+                    b'<' |
+                    b'=' |
+                    b'`' => {
+                        // TODO: unexpected-character-in-unquoted-attribute-value error
+                        self.builder.push_to_buffer(char);
+                    },
+                    _ => { self.builder.push_to_buffer(char); }
+                }
+            },
             States::AfterAttributeValueQuoted => {
                 match char {
                     b'\t' |
@@ -406,8 +423,7 @@ impl<'stream> Tokenizer<'stream> {
                     b'/' => self.state = States::SelfClosingStartTag,
                     b'>' => {
                         self.state = States::Data;
-                        self.tokens.push(self.builder.build());
-                        self.builder = TokenBuilder::default();
+                        return Ok(Some(self.builder.build()));
                     },
                     _ => {
                         // TODO: missing-whitespace-between-attributes error
@@ -449,10 +465,72 @@ impl<'stream> Tokenizer<'stream> {
                 }
             },
             States::DocType => {
+                match char {
+                    b'\t' |
+                    b'\n'/* LF */ |
+                    0x0C /* FF */ |
+                    b' ' => self.state = States::BeforeDocTypeName,
+                    b'>' => {
+                        self.stream.reconsume();
+                        self.state = States::BeforeDocTypeName;
+                    },
+                    _ => {
+                        // TODO: missing-whitesspace-before-doctype-name error
+                        self.stream.reconsume();
+                        self.state = States::BeforeDocTypeName;
+                    }
+                }
+            },
+            States::BeforeDocTypeName => {
+                match char {
+                    b'\t' |
+                    b'\n'/* LF */ |
+                    0x0C /* FF */ |
+                    b' ' => { /* ignore */  },
+                    b'A'..=b'Z' => {
+                        self.builder.push_to_buffer(char);
+                        self.state = States::DocTypeName;
+                    },
+                    b'\0' => {
+                        // TODO: unexpected-null-character error
+                        todo!()
+                    },
+                    b'>' => {
+                        // TODO: missing-doctype-name error
+                        self.builder.force_quirks();
+                        self.state = States::Data;
+                        return Ok(Some(self.builder.build()));
+                    },
+                    _ => {
+                        self.builder.push_to_buffer(char);
+                        self.state = States::DocTypeName;
+                    }
+                }
 
             },
-            // BeforeDocType,
-            // DocTypeName,
+            States::DocTypeName => {
+                match char {
+                    b'\t' |
+                    b'\n'/* LF */ |
+                    0x0C /* FF */ |
+                    b' ' => self.state = States::AfterDocTypeName,
+                    b'>' => {
+                        self.state = States::Data;
+                        self.builder.set_variant(TokenVariant::Doctype)?;
+                        return Ok(Some(self.builder.build()));
+                    },
+                    b'A'..=b'Z' => {
+                        self.builder.push_to_buffer(char);
+                    },
+                    b'\0' => {
+                        // TODO: unexpected-null-character error
+                        self.builder.push_replacement_character_to_buffer();
+                    },
+                    _ => {
+                        self.builder.push_to_buffer(char);
+                    }
+                }
+            },
             // AfterDocTypeName,
             // AfterDocTypeNamePublicKeyword,
             // BeforeDocTypePublicIdentifier,

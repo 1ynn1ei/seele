@@ -16,7 +16,10 @@ pub fn make_dom(data: &Vec<u8>) -> Result<(), HTMLError> {
         if let Some(token) = next_emit {
             match token {
                 tokens::Token::EndOfFile => break,
-                _ => parser.parse_token(token),
+                _ => {
+                    println!("{:?}", token.present());
+                    parser.parse_token(token)
+                }
             }
         }
     }

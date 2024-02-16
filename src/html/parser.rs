@@ -32,6 +32,7 @@ pub enum Mode {
 pub struct Parser {
     template_insertion_modes: Vec<Mode>,
     open_elements: Vec<Box<dyn dom::DomObject>>,
+    document: dom::Document,
 }
 
 impl Parser {
@@ -39,6 +40,7 @@ impl Parser {
         Self {
             template_insertion_modes: vec![Mode::Initial],
             open_elements: Vec::new(),
+            document: dom::Document::default()
         }
     }
 
@@ -48,9 +50,32 @@ impl Parser {
     fn initial_ruleset(&mut self, token: Token) {
         match token {
             Token::Character(byte) => {},
-            Token::Comment(chars) => {},
+            Token::Comment(bytes) => {},
             Token::Doctype(doctype) => {},
             _ => {},
+        }
+    }
+
+    fn before_html_ruleset(&mut self, token: Token) {
+        match token {
+            Token::Doctype(_) => {
+                // TODO: parse error
+            },
+            Token::Comment(bytes) => {
+                todo!()
+            },
+            Token::Character(byte) => {
+                todo!()
+            },
+            Token::StartTag(tag) => {
+                todo!()
+            },
+            Token::EndTag(tag) => {
+                todo!()
+            },
+            _ => {
+                todo!()
+            }
         }
     }
 }

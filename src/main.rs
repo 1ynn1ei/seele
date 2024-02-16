@@ -1,5 +1,6 @@
 mod html;
 mod stream;
+mod arena;
 use std::{env, fs};
 
 fn main() {

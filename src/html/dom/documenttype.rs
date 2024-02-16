@@ -29,7 +29,7 @@ impl DocumentType {
         public_id: Option<String>,
         system_id: Option<String>
         ) -> Box<Self> {
-        Box::new(DocumentType::spawn(name, public_id, system_id))
+        Box::new(Self::spawn(name, public_id, system_id))
     }
 }
 

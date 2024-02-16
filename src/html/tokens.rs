@@ -8,7 +8,6 @@ pub enum TokenVariant {
     EndTag,
     Comment,
     Character,
-    EndOfFile,
 }
 
 #[derive(Default)]
@@ -73,9 +72,6 @@ impl<'stream> TokenBuilder<'stream> {
             TokenVariant::Character => {
                 Token::Character(self.buffer.pop().unwrap())
             },
-            TokenVariant::EndOfFile => {
-                Token::EndOfFile
-            }
         };
         self.variant = None;
         self.doctype = DocType::default();

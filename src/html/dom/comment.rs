@@ -21,7 +21,7 @@ impl Comment {
     pub fn new(
         data: Option<String>,
         ) -> Box<Self> {
-        Box::new(Comment::spawn(data))
+        Box::new(Self::spawn(data))
     }
 }
 impl DomObject for Comment {}

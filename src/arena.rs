@@ -3,13 +3,19 @@ pub enum ArenaError {
     IndexOutOfBounds
 }
 
-#[derive(Default)]
 pub struct Arena<T> {
     active_pool: Vec<Option<T>>,
     inactive_pool: Vec<ArenaRef>,
 }
 
 impl<T> Arena<T> {
+    pub fn new() -> Self {
+        Self {
+            active_pool: Vec::new(),
+            inactive_pool: Vec::new(),
+        }
+    }
+
     pub fn get(&self, index: ArenaRef) -> Option<&T> {
         match self.active_pool.get(index) {
             Some(elem) => elem.as_ref(),

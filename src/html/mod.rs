@@ -5,7 +5,8 @@ pub mod tokenizer;
 
 #[derive(Debug)]
 pub enum HTMLError {
-    TokenBuilderImproperlyCleared
+    TokenBuilderImproperlyCleared,
+    InaccessibleDomTreeNode
 }
 
 pub fn make_dom(data: &Vec<u8>) -> Result<(), HTMLError> {

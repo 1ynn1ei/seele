@@ -51,7 +51,9 @@ impl Parser {
         match token {
             Token::Character(byte) => {},
             Token::Comment(bytes) => {},
-            Token::Doctype(doctype) => {},
+            Token::Doctype(doctype) => {
+                // make a new doc type node
+            },
             _ => {},
         }
     }

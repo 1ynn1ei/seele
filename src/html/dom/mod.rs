@@ -25,11 +25,11 @@ impl DomTree {
         }
     }
 
-    pub fn insert<T:DomObject> (
+    pub fn insert (
             &mut self, 
-            obj: T, 
+            obj: Box<dyn DomObject>, 
             parent: ArenaRef) -> Result<ArenaRef, HTMLError> {
-        let mut node = DomNode::new(Box::new(obj));
+        let mut node = DomNode::new(obj);
         node.parent = Some(parent);
         let child_ref : ArenaRef = self.arena.add(node);
         if let Some(parent) = self.arena.get_mut(parent) {

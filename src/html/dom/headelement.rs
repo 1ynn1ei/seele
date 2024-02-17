@@ -1,16 +1,11 @@
-use crate::html::dom::{
-    DomObject,
-    Node
-};
+use crate::html::dom::DomObject;
 
 pub struct HeadElement {
-    node: Node
 }
 
 impl HeadElement {
     pub fn spawn() -> Self {
         Self {
-            node: Node::default(),
         }
     }
 

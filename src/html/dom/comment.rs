@@ -1,10 +1,6 @@
-use crate::html::dom::{
-    DomObject,
-    Node
-};
+use crate::html::dom::DomObject;
 
 pub struct Comment {
-    node: Node,
     data: Option<String>,
 }
 
@@ -13,7 +9,6 @@ impl Comment {
         data: Option<String>,
         ) -> Self {
         Self {
-            node: Node::default(),
             data,
         }
     }

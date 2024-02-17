@@ -1,10 +1,6 @@
-use crate::html::dom::{
-    DomObject,
-    Node
-};
+use crate::html::dom::DomObject;
 
 pub struct DocumentType {
-    node: Node,
     name: String,
     public_id: String,
     system_id: String,
@@ -17,7 +13,6 @@ impl DocumentType {
         system_id: Option<String>
         ) -> Self {
         Self {
-            node: Node::default(),
             name,
             public_id: public_id.unwrap_or_default(),
             system_id: system_id.unwrap_or_default(),

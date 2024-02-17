@@ -8,7 +8,6 @@ pub enum TokenVariant {
     EndTag,
     Comment,
     Character,
-    EndOfFile,
 }
 
 #[derive(Default)]
@@ -30,6 +29,19 @@ impl<'stream> TokenBuilder<'stream> {
         }
     }
 
+    pub fn push_to_buffer(&mut self, char: &'stream u8) {
+        self.buffer.push(char);
+    }
+
+    pub fn push_replacement_character_to_buffer(&mut self) {
+        self.buffer.push(&0xFF);
+        self.buffer.push(&0xFD);
+    }
+
+    pub fn commit_buffer_to_doctype_name(&mut self) {
+        self.doctype.name = mem::take(&mut self.buffer);
+    }
+
     pub fn commit_buffer_to_attr_keys(&mut self) {
         self.tag.attr_keys.push(mem::take(&mut self.buffer));
     }
@@ -38,9 +50,13 @@ impl<'stream> TokenBuilder<'stream> {
         self.tag.attr_values.push(mem::take(&mut self.buffer));
     }
 
+    pub fn force_quirks(&mut self) {
+        self.doctype.force_quirks = true;
+    }
+
     pub fn build(&mut self) -> Token<'stream> {
         // TODO: we need to properly handle error here! lol 
-        match self.variant.as_mut().unwrap() {
+        let token = match self.variant.as_mut().unwrap() {
             TokenVariant::Doctype => {
                 Token::Doctype(mem::take(&mut self.doctype))
             },
@@ -56,10 +72,12 @@ impl<'stream> TokenBuilder<'stream> {
             TokenVariant::Character => {
                 Token::Character(self.buffer.pop().unwrap())
             },
-            TokenVariant::EndOfFile => {
-                Token::EndOfFile
-            }
-        }
+        };
+        self.variant = None;
+        self.doctype = DocType::default();
+        self.tag = Tag::default();
+        self.buffer = Vec::new();
+        token
     }
 }
 

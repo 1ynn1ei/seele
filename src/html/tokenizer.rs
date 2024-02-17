@@ -3,7 +3,6 @@ use crate::html::{
     HTMLError
 };
 use crate::stream::Stream;
-const LOWERCASE_OFFSET : u8 = 0x0020;
 
 pub type TokenList<'stream> = Vec<Token<'stream>>;
 #[derive(Debug)]
@@ -62,7 +61,7 @@ pub enum States {
     CommentEnd,
     CommentEndBang,
     DocType,
-    BeforeDocType,
+    BeforeDocTypeName,
     DocTypeName,
     AfterDocTypeName,
     AfterDocTypeNamePublicKeyword,
@@ -110,21 +109,17 @@ impl<'stream> Tokenizer<'stream> {
         }
     }
 
-    pub fn make_tokens(&mut self) -> Result<&TokenList<'stream>, HTMLError> {
-        // check EOF before rest
-        loop {
-            if self.stream.is_eof() {
-                // if EOF, go into EOF handler. some states create errors
-                self.tokens.push(Token::EndOfFile);
-                return Ok(&self.tokens);
-            } else {
-                println!("{:?}", self.state);
-                self.run_state()?;
-            }
+    pub fn get_next_token(&mut self) -> Result<Option<Token>, HTMLError> {
+        if self.stream.is_eof() {
+            // TODO: we need to handle EOF differnet for some states
+            Ok(Some(Token::EndOfFile))
+        } else {
+            println!("{:?}", self.state);
+            self.run_state()
         }
     }
 
-    pub fn run_state(&mut self) -> Result<(), HTMLError> {
+    pub fn run_state(&mut self) -> Result<Option<Token>, HTMLError> {
         let char = self.stream.current();
         self.stream.advance();
         match self.state {
@@ -143,14 +138,13 @@ impl<'stream> Tokenizer<'stream> {
                         // TODO: log unexpected-null-character error
                         self.builder.set_variant(TokenVariant::Character)?;
                         self.builder.buffer.push(char);
-                        self.tokens.push(self.builder.build());
-                        self.builder = TokenBuilder::default();
+                        return Ok(Some(self.builder.build()));
+
                     },
                     _ => {
                         self.builder.set_variant(TokenVariant::Character)?;
                         self.builder.buffer.push(char);
-                        self.tokens.push(self.builder.build());
-                        self.builder = TokenBuilder::default();
+                        return Ok(Some(self.builder.build()));
                     }
                 }
             },
@@ -170,8 +164,7 @@ impl<'stream> Tokenizer<'stream> {
                     _ => {
                         self.builder.set_variant(TokenVariant::Character)?;
                         self.builder.buffer.push(char);
-                        self.tokens.push(self.builder.build());
-                        self.builder = TokenBuilder::default();
+                        return Ok(Some(self.builder.build()));
                     }
                 }
             },
@@ -187,8 +180,7 @@ impl<'stream> Tokenizer<'stream> {
                     _ => {
                         self.builder.set_variant(TokenVariant::Character)?;
                         self.builder.buffer.push(char);
-                        self.tokens.push(self.builder.build());
-                        self.builder = TokenBuilder::default();
+                        return Ok(Some(self.builder.build()));
                     }
                 }
             },
@@ -204,8 +196,7 @@ impl<'stream> Tokenizer<'stream> {
                     _ => {
                         self.builder.set_variant(TokenVariant::Character)?;
                         self.builder.buffer.push(char);
-                        self.tokens.push(self.builder.build());
-                        self.builder = TokenBuilder::default();
+                        return Ok(Some(self.builder.build()));
                     }
                 }
             },
@@ -220,8 +211,7 @@ impl<'stream> Tokenizer<'stream> {
                     _ => {
                         self.builder.set_variant(TokenVariant::Character)?;
                         self.builder.buffer.push(char);
-                        self.tokens.push(self.builder.build());
-                        self.builder = TokenBuilder::default();
+                        return Ok(Some(self.builder.build()));
                     }
                 }
             },
@@ -283,8 +273,7 @@ impl<'stream> Tokenizer<'stream> {
                     b'/' => { self.state = States::SelfClosingStartTag; },
                     b'>' => {
                         self.state = States::Data;
-                        self.tokens.push(self.builder.build());
-                        self.builder = TokenBuilder::default();
+                        return Ok(Some(self.builder.build()));
                     },
                     b'A'..=b'Z' => {
                         // TODO: handle lowercasing of tags during the tree creation
@@ -374,8 +363,7 @@ impl<'stream> Tokenizer<'stream> {
                     b'>' => {
                         // TODO: missing-attribute-value error
                         self.state = States::Data;
-                        self.tokens.push(self.builder.build());
-                        self.builder = TokenBuilder::default();
+                        return Ok(Some(self.builder.build()));
                     },
                     _ => {
                         self.state = States::AttributeValueUnquoted;
@@ -401,6 +389,32 @@ impl<'stream> Tokenizer<'stream> {
                     _ => self.builder.buffer.push(char)
                 }
             }
+            States::AttributeValueUnquoted => {
+                match char {
+                    b'\t' |
+                    b'\n'/* LF */ |
+                    0x0C /* FF */ |
+                    b' ' => self.state = States::BeforeAttributeName,
+                    b'&' => {
+                        self.return_state = States::AttributeValueUnquoted;
+                        self.state = States::CharacterReference;
+                    },
+                    b'>' => {
+                        self.state = States::Data;
+                        self.builder.commit_buffer_to_attr_value();
+                        return Ok(Some(self.builder.build()));
+                    },
+                    b'"' |
+                    b'\''|
+                    b'<' |
+                    b'=' |
+                    b'`' => {
+                        // TODO: unexpected-character-in-unquoted-attribute-value error
+                        self.builder.push_to_buffer(char);
+                    },
+                    _ => { self.builder.push_to_buffer(char); }
+                }
+            },
             States::AfterAttributeValueQuoted => {
                 match char {
                     b'\t' |
@@ -410,8 +424,7 @@ impl<'stream> Tokenizer<'stream> {
                     b'/' => self.state = States::SelfClosingStartTag,
                     b'>' => {
                         self.state = States::Data;
-                        self.tokens.push(self.builder.build());
-                        self.builder = TokenBuilder::default();
+                        return Ok(Some(self.builder.build()));
                     },
                     _ => {
                         // TODO: missing-whitespace-between-attributes error
@@ -420,8 +433,120 @@ impl<'stream> Tokenizer<'stream> {
                     }
                 }
             }
+
+            // AfterAttributeValueQuoted,
+            // SelfClosingStartTag,
+            // BogusComment,
+            States::MarkupDeclarationOpen => {
+                match char {
+                    b'-' => {
+                        if self.stream.expect("-") {
+                            self.stream.consume("--");
+                            self.state = States::Comment;
+                        } else {
+                            todo!()
+                        }
+                    },
+                    b'd' | b'D' => {
+                        if self.stream.expect("OCTYPE") {
+                            self.stream.consume("doctype");
+                            self.state = States::DocType;
+                        } else {
+                            todo!()
+                        }
+                    },
+                    b'[' => {
+                        if self.stream.expect("CDATA[") {
+                            todo!()
+                        } else {
+                            todo!()
+                        }
+                    },
+                    _ => { todo!() }
+                }
+            },
+            States::DocType => {
+                match char {
+                    b'\t' |
+                    b'\n'/* LF */ |
+                    0x0C /* FF */ |
+                    b' ' => self.state = States::BeforeDocTypeName,
+                    b'>' => {
+                        self.stream.reconsume();
+                        self.state = States::BeforeDocTypeName;
+                    },
+                    _ => {
+                        // TODO: missing-whitesspace-before-doctype-name error
+                        self.stream.reconsume();
+                        self.state = States::BeforeDocTypeName;
+                    }
+                }
+            },
+            States::BeforeDocTypeName => {
+                match char {
+                    b'\t' |
+                    b'\n'/* LF */ |
+                    0x0C /* FF */ |
+                    b' ' => { /* ignore */  },
+                    b'A'..=b'Z' => {
+                        self.builder.push_to_buffer(char);
+                        self.state = States::DocTypeName;
+                    },
+                    b'\0' => {
+                        // TODO: unexpected-null-character error
+                        todo!()
+                    },
+                    b'>' => {
+                        // TODO: missing-doctype-name error
+                        self.builder.force_quirks();
+                        self.state = States::Data;
+                        return Ok(Some(self.builder.build()));
+                    },
+                    _ => {
+                        self.builder.push_to_buffer(char);
+                        self.state = States::DocTypeName;
+                    }
+                }
+
+            },
+            States::DocTypeName => {
+                match char {
+                    b'\t' |
+                    b'\n'/* LF */ |
+                    0x0C /* FF */ |
+                    b' ' => self.state = States::AfterDocTypeName,
+                    b'>' => {
+                        self.state = States::Data;
+                        self.builder.set_variant(TokenVariant::Doctype)?;
+                        return Ok(Some(self.builder.build()));
+                    },
+                    b'A'..=b'Z' => {
+                        self.builder.push_to_buffer(char);
+                    },
+                    b'\0' => {
+                        // TODO: unexpected-null-character error
+                        self.builder.push_replacement_character_to_buffer();
+                    },
+                    _ => {
+                        self.builder.push_to_buffer(char);
+                    }
+                }
+            },
+            // AfterDocTypeName,
+            // AfterDocTypeNamePublicKeyword,
+            // BeforeDocTypePublicIdentifier,
+            // DocTypePublicIdentifierDoubleQuoted,
+            // DocTypePublicIdentifierSingleQuoted,
+            // AfterDocTypePublicIdentifier,
+            // BetweenDocTypePublicSystemIdentifiers,
+            // AfterDocTypeSystemKeyword,
+            // BeforeDocTypeSystemIdentifier,
+            // DocTypeSystemIdentifierDoubleQuoted,
+            // DocTypeSystemIdentifierSingleQuoted,
+            // AfterDocTypeSystemIdentifier,
+            // BogusDocType,
             _ => todo!(),
         }
-        Ok(())
+        Ok(None)
     }
 }

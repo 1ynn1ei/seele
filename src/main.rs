@@ -1,17 +1,13 @@
 mod html;
 mod stream;
-use html::tokenizer::Tokenizer;
+mod arena;
 use std::{env, fs};
 
 fn main() {
     env::set_var("RUST_BACKTRACE", "1");
     let data = fs::read("./simple_test.html").unwrap();
-    let mut tokenizer = Tokenizer::new(&data);
-    match tokenizer.make_tokens() {
+    match html::make_dom(&data) {
         Ok(res) => {
-            for token in res {
-                println!("{:?}", token.present());
-            }
         },
         Err(err) => {
             println!("{:?}", err);

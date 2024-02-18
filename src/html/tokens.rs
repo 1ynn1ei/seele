@@ -94,7 +94,7 @@ pub enum Token<'stream> {
 
 impl<'stream> Token<'stream> {
 
-    fn printer_hepler(&self, data: &[&'stream u8]) -> String {
+    fn printer_helper(&self, data: &[&'stream u8]) -> String {
         String::from_utf8(data
             .iter()
             .map(|&x| *x)
@@ -109,9 +109,15 @@ impl<'stream> Token<'stream> {
                 fmt_str.push_str("DocType ");
                 fmt_str
             },
-            Self::Comment(data) => self.printer_hepler(data),
+            Self::Comment(data) => {
+                let mut fmt_str = "Comment: ".to_string();
+                fmt_str.push_str(&self.printer_helper(data));
+                fmt_str
+            },
             Self::Character(byte) => {
-                self.printer_hepler(&[*byte])
+                let mut fmt_str = "Character: ".to_string();
+                fmt_str.push_str(&self.printer_helper(&[*byte]));
+                fmt_str
             },
             Self::EndTag(tag) |
             Self::StartTag(tag) => {
@@ -121,23 +127,17 @@ impl<'stream> Token<'stream> {
                     Self::StartTag(_) => fmt_str.push_str("StartTag: "),
                     _ => {}
                 }
-                fmt_str.push_str(&self.printer_hepler(&tag.name));
+                fmt_str.push_str(&self.printer_helper(&tag.name));
                 fmt_str.push('[');
                 for i in 0..tag.attr_keys.len() {
                     fmt_str.push(' ');
                     let key = tag.attr_keys.get(i).unwrap();
-                    let key_str = String::from_utf8(key
-                                .iter()
-                                .map(|&x| *x)
-                                .collect()).unwrap();
+                    let key_str = self.printer_helper(key); 
                     fmt_str.push_str(&key_str);
                     fmt_str.push_str(": ");
                     match tag.attr_values.get(i) {
                         Some(bytes) => {
-                            fmt_str.push_str(&String::from_utf8(bytes
-                                        .iter()
-                                        .map(|&x| *x)
-                                        .collect()).unwrap());
+                            fmt_str.push_str(&self.printer_helper(bytes));
                         },
                         None => {
                             fmt_str.push_str("EMPTY");
@@ -147,7 +147,6 @@ impl<'stream> Token<'stream> {
                 fmt_str.push(']');
                 fmt_str
             }
-            _ => String::from("TBD")
         }
     }
 }

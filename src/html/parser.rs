@@ -55,7 +55,8 @@ pub enum Mode {
 }
 
 pub struct Parser {
-    template_insertion_modes: Vec<Mode>,
+    // template_insertion_modes: Vec<Mode>,
+    insertion_mode: Mode,
     open_elements: Vec<ArenaRef>,
     dom_tree: dom::DomTree,
 }
@@ -63,22 +64,24 @@ pub struct Parser {
 impl Parser {
     pub fn new() -> Self {
         Self {
-            template_insertion_modes: vec![Mode::Initial],
+            // template_insertion_modes: vec![Mode::Initial],
+            insertion_mode: Mode::Initial,
             open_elements: Vec::new(),
             dom_tree: dom::DomTree::new(dom::Document::new()),
         }
     }
 
     pub fn parse_token(&mut self, token: Token) -> Result<(), HTMLError> {
-        if let Some(state) = self.template_insertion_modes.pop() {
-            println!("[PARSER STATE: {:?}]", state);
-            match state {
-                Mode::Initial => self.initial_ruleset(token),
-                _ => todo!()
-            }
-        } else {
-            Err(HTMLError::ParserWithoutInsertionMode)
+        // if let Some(state) = self.template_insertion_modes.pop() {
+        println!("[PARSER STATE: {:?}]", self.insertion_mode);
+        match self.insertion_mode {
+            Mode::Initial => self.initial_ruleset(token),
+            Mode::BeforeHtml => self.before_html_ruleset(token),
+            _ => todo!()
         }
+        // } else {
+        //     Err(HTMLError::ParserWithoutInsertionMode)
+        // }
     }
 
     fn initial_ruleset(&mut self, token: Token) -> Result<(), HTMLError> {
@@ -95,7 +98,8 @@ impl Parser {
                             None 
                         ), 0
                     )?;
-                    self.template_insertion_modes.push(Mode::BeforeHtml);
+                    // self.template_insertion_modes.push(Mode::BeforeHtml);
+                    self.insertion_mode = Mode::BeforeHtml;
                     Ok(())
                 } else {
                     // parser error
@@ -106,16 +110,25 @@ impl Parser {
         }
     }
 
-    fn before_html_ruleset(&mut self, token: Token) {
+    fn before_html_ruleset(&mut self, token: Token) -> Result<(), HTMLError> {
         match token {
             Token::Doctype(_) => {
-                // TODO: parse error
+                Err(HTMLError::ParseError)
             },
             Token::Comment(bytes) => {
                 todo!()
             },
             Token::Character(byte) => {
-                todo!()
+                println!("{}, {}", byte, b'\n');
+                match byte {
+                    b'\t' |
+                    b'\n'/* LF */ |
+                    0x0C /* FF */ |
+                    b' ' => Ok(()),
+                    _ => {
+                        todo!()
+                    }
+                }
             },
             Token::StartTag(tag) => {
                 todo!()

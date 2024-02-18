@@ -77,6 +77,7 @@ impl Parser {
         match self.insertion_mode {
             Mode::Initial => self.initial_ruleset(token),
             Mode::BeforeHtml => self.before_html_ruleset(token),
+            Mode::BeforeHead => self.before_head_ruleset(token),
             _ => todo!()
         }
         // } else {
@@ -119,7 +120,6 @@ impl Parser {
                 todo!()
             },
             Token::Character(byte) => {
-                println!("{}, {}", byte, b'\n');
                 match byte {
                     b'\t' |
                     b'\n'/* LF */ |
@@ -131,7 +131,16 @@ impl Parser {
                 }
             },
             Token::StartTag(tag) => {
-                todo!()
+                if cmp_token_string(&tag.name, "html") {
+                    self.dom_tree.insert(
+                        dom::HeadElement::new(
+                        ), 0
+                    )?;
+                    self.insertion_mode = Mode::BeforeHead;
+                    Ok(())
+                } else {
+                    todo!()
+                }
             },
             Token::EndTag(tag) => {
                 todo!()
@@ -139,6 +148,39 @@ impl Parser {
             _ => {
                 todo!()
             }
+        }
+    }
+
+    fn before_head_ruleset(&mut self, token: Token) -> Result<(), HTMLError> {
+        match token {
+            Token::Character(byte) => {
+                match byte {
+                    b'\t' |
+                    b'\n'/* LF */ |
+                    0x0C /* FF */ |
+                    b' ' => Ok(()),
+                    _ => {
+                        todo!()
+                    }
+                }
+            },
+            Token::Comment(bytes) => todo!(),
+            Token::Doctype(_) => todo!(),
+            Token::StartTag(tag) => {
+                if cmp_token_string(&tag.name, "html") {
+                    todo!()
+                }
+                if cmp_token_string(&tag.name, "head") {
+                    let head_ref = self.dom_tree.insert(
+                        dom::HeadElement::new(
+                        ), 0
+                    )?;
+                    self.dom_tree.set_head(head_ref);
+                    self.insertion_mode = Mode::InHead;
+                    Ok(())
+                } else { todo!() }
+            },
+            _ => todo!()
         }
     }
 }

@@ -17,6 +17,7 @@ use crate::arena::{ArenaRef, Arena};
 pub struct DomTree {
     root: Option<ArenaRef>,
     doctype: Option<ArenaRef>,
+    head: Option<ArenaRef>,
     arena: Arena<DomNode>,
 }
 
@@ -27,6 +28,7 @@ impl DomTree {
         Self {
             root: Some(root_ref),
             doctype: None,
+            head: None,
             arena,
         }
     }
@@ -48,6 +50,10 @@ impl DomTree {
 
     pub fn set_doctype(&mut self, doctype: ArenaRef) {
         self.doctype = Some(doctype);
+    }
+
+    pub fn set_head(&mut self, head: ArenaRef) {
+        self.head = Some(head);
     }
 }
 

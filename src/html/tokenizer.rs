@@ -114,7 +114,7 @@ impl<'stream> Tokenizer<'stream> {
             // TODO: we need to handle EOF differnet for some states
             Ok(Some(Token::EndOfFile))
         } else {
-            println!("{:?}", self.state);
+            println!("[TOKENIZER STATE:{:?}]", self.state);
             self.run_state()
         }
     }
@@ -518,6 +518,7 @@ impl<'stream> Tokenizer<'stream> {
                     b'>' => {
                         self.state = States::Data;
                         self.builder.set_variant(TokenVariant::Doctype)?;
+                        self.builder.commit_buffer_to_doctype_name();
                         return Ok(Some(self.builder.build()));
                     },
                     b'A'..=b'Z' => {

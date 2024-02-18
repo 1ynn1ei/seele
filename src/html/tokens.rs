@@ -104,6 +104,11 @@ impl<'stream> Token<'stream> {
     pub fn present(&self) -> String {
         match self {
             Self::EndOfFile => String::from("EOF"),
+            Self::Doctype(doctype) => {
+                let mut fmt_str = String::new();
+                fmt_str.push_str("DocType ");
+                fmt_str
+            },
             Self::Comment(data) => self.printer_hepler(data),
             Self::Character(byte) => {
                 self.printer_hepler(&[*byte])
@@ -150,7 +155,7 @@ impl<'stream> Token<'stream> {
 //https://html.spec.whatwg.org/multipage/parsing.html#tokenization
 #[derive(Debug, Default)]
 pub struct DocType<'stream> {
-    name: Vec<&'stream u8>, 
+    pub name: Vec<&'stream u8>, 
     public_id: Vec<&'stream u8>, 
     system_id: Vec<&'stream u8>,
     force_quirks: bool,

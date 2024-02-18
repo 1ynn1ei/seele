@@ -6,7 +6,9 @@ pub mod tokenizer;
 #[derive(Debug)]
 pub enum HTMLError {
     TokenBuilderImproperlyCleared,
-    InaccessibleDomTreeNode
+    ParserWithoutInsertionMode,
+    InaccessibleDomTreeNode,
+    ParseError,
 }
 
 pub fn make_dom(data: &Vec<u8>) -> Result<(), HTMLError> {
@@ -18,8 +20,8 @@ pub fn make_dom(data: &Vec<u8>) -> Result<(), HTMLError> {
             match token {
                 tokens::Token::EndOfFile => break,
                 _ => {
-                    println!("{:?}", token.present());
-                    parser.parse_token(token)
+                    println!("[TOKENIZER EMIT: {:?}]", token.present());
+                    parser.parse_token(token)?
                 }
             }
         }

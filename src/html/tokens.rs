@@ -160,11 +160,32 @@ pub struct DocType<'stream> {
     force_quirks: bool,
 }
 
+// TODO: this needs to go 
+fn dom_string_from_token_string(token_string: &[&u8]) -> String {
+    String::from_utf8(token_string
+        .iter()
+        .map(|&x| *x)
+        .collect()).unwrap()
+}
+
 #[derive(Debug, Default)]
 pub struct Tag<'stream> {
     pub name: Vec<&'stream u8>,
     pub self_closing: bool,
     pub attr_keys: Vec<Vec<&'stream u8>>,
     pub attr_values: Vec<Vec<&'stream u8>>,
+}
+
+impl<'stream> Tag<'stream> {
+    pub fn get_class_list(&self) -> Option<String> {
+        for (i, val) in self.attr_keys.iter().enumerate() {
+            if dom_string_from_token_string(val) == "class" {
+                return Some(
+                    dom_string_from_token_string(&self.attr_values[i])
+                    );
+            }
+        }
+        None
+    }
 }
 

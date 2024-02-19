@@ -78,6 +78,7 @@ impl Parser {
             Mode::Initial => self.initial_ruleset(token),
             Mode::BeforeHtml => self.before_html_ruleset(token),
             Mode::BeforeHead => self.before_head_ruleset(token),
+            Mode::InHead => self.in_head_ruleset(token),
             _ => todo!()
         }
         // } else {
@@ -176,11 +177,60 @@ impl Parser {
                         ), 0
                     )?;
                     self.dom_tree.set_head(head_ref);
+                    self.open_elements.push(head_ref);
                     self.insertion_mode = Mode::InHead;
                     Ok(())
                 } else { todo!() }
             },
             _ => todo!()
         }
+    }
+
+    fn in_head_ruleset(&mut self, token: Token) -> Result<(), HTMLError> {
+        match token {
+            Token::Character(byte) => {
+                match byte {
+                    b'\t' |
+                    b'\n'/* LF */ |
+                    0x0C /* FF */ |
+                    b' ' => Ok(()),
+                    _ => {
+                        todo!()
+                    }
+                }
+            },
+            Token::Comment(bytes) => todo!(),
+            Token::Doctype(_) => todo!(),
+            Token::StartTag(ref tag) => {
+                match dom_string_from_token_string(&tag.name).as_str() {
+                    "title" => {
+                        self.generic_rcdata_element_ruleset(&token)
+                    },
+                    _ => todo!(),
+                }
+            },
+            Token::EndTag(tag) => todo!(),
+            _ => { todo!() }
+        }
+    }
+
+    fn generic_rcdata_element_ruleset(&mut self, token: &Token) -> Result<(), HTMLError> {
+        match token {
+            Token::StartTag(tag) => {
+                self.dom_tree.insert(
+                    dom::Element::new(
+                        dom_string_from_token_string(&tag.name),
+                        "id".to_string(),
+                        tag.get_class_list().unwrap_or_default(),
+                    ), *self.open_elements.last().unwrap()
+                );
+            },
+            _ => todo!(),
+        }
+        Ok(())
+    }
+    
+    fn generic_raw_text_element_ruleset() -> Result<(), HTMLError> {
+        todo!()
     }
 }

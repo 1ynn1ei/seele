@@ -1,4 +1,5 @@
 mod documenttype;
+mod element;
 mod htmlelement;
 mod headelement;
 mod comment;
@@ -7,6 +8,7 @@ mod document;
 pub use documenttype::DocumentType;
 pub use htmlelement::HtmlElement;
 pub use headelement::HeadElement;
+pub use element::Element;
 pub use document::Document;
 pub use comment::Comment;
 
@@ -73,7 +75,5 @@ impl DomNode {
     }
 }
 
-pub trait DomObject {
-
-}
+pub trait DomObject {}
 

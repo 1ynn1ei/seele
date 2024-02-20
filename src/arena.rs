@@ -39,7 +39,7 @@ impl<T> Arena<T> {
             self.active_pool.len() - 1
         }
     }
-
+    
     pub fn remove(&mut self, index: ArenaRef) -> Result<(), ArenaError> {
         if index >= self.active_pool.len() {
             Err(ArenaError::IndexOutOfBounds)

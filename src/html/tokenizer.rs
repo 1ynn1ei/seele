@@ -92,7 +92,7 @@ pub enum States {
 
 pub struct Tokenizer<'stream> {
     stream: Stream<'stream>,
-    state: States,
+    pub state: States,
     return_state: States,
     tokens: TokenList<'stream>,
     builder: TokenBuilder<'stream>,

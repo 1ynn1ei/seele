@@ -21,7 +21,18 @@ pub fn make_dom(data: &Vec<u8>) -> Result<(), HTMLError> {
                 tokens::Token::EndOfFile => break,
                 _ => {
                     println!("[TOKENIZER EMIT: {:?}]", token.present());
-                    parser.parse_token(token)?
+                    match parser.parse_token(token) {
+                        Ok(token_state) => {
+                            match token_state {
+                                Some(state) => {
+                                    tokenizer.state = state;
+                                },
+                                None => {
+                                }
+                            }
+                        },
+                        Err(err) => { return Err(err); }
+                    }
                 }
             }
         }

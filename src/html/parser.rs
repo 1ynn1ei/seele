@@ -1,11 +1,15 @@
 use crate::{
     arena::ArenaRef,
     html::{
+        tokenizer,
         HTMLError,
         tokens::Token,
         dom,
     }
 };
+
+type TokenizerState = tokenizer::States;
+type ParserResult = Result<Option<TokenizerState>, HTMLError>;
 
 fn cmp_token_string(token_string: &[&u8], cmp: &str) -> bool {
     if token_string.len() != cmp.len() {
@@ -27,7 +31,7 @@ fn dom_string_from_token_string(token_string: &[&u8]) -> String {
         .collect()).unwrap()
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Mode {
     Initial,
     BeforeHtml,
@@ -57,6 +61,7 @@ pub enum Mode {
 pub struct Parser {
     // template_insertion_modes: Vec<Mode>,
     insertion_mode: Mode,
+    original_mode: Option<Mode>,
     open_elements: Vec<ArenaRef>,
     dom_tree: dom::DomTree,
 }
@@ -66,12 +71,13 @@ impl Parser {
         Self {
             // template_insertion_modes: vec![Mode::Initial],
             insertion_mode: Mode::Initial,
+            original_mode: None,
             open_elements: Vec::new(),
             dom_tree: dom::DomTree::new(dom::Document::new()),
         }
     }
 
-    pub fn parse_token(&mut self, token: Token) -> Result<(), HTMLError> {
+    pub fn parse_token(&mut self, token: Token) -> ParserResult {
         // if let Some(state) = self.template_insertion_modes.pop() {
         println!("[PARSER STATE: {:?}]", self.insertion_mode);
         match self.insertion_mode {
@@ -86,7 +92,7 @@ impl Parser {
         // }
     }
 
-    fn initial_ruleset(&mut self, token: Token) -> Result<(), HTMLError> {
+    fn initial_ruleset(&mut self, token: Token) -> ParserResult {
         match token {
             Token::Character(byte) => { todo!() },
             Token::Comment(bytes) => { todo!() },
@@ -102,7 +108,7 @@ impl Parser {
                     )?;
                     // self.template_insertion_modes.push(Mode::BeforeHtml);
                     self.insertion_mode = Mode::BeforeHtml;
-                    Ok(())
+                    Ok(None)
                 } else {
                     // parser error
                     Err(HTMLError::ParseError)
@@ -112,7 +118,7 @@ impl Parser {
         }
     }
 
-    fn before_html_ruleset(&mut self, token: Token) -> Result<(), HTMLError> {
+    fn before_html_ruleset(&mut self, token: Token) -> ParserResult {
         match token {
             Token::Doctype(_) => {
                 Err(HTMLError::ParseError)
@@ -125,7 +131,7 @@ impl Parser {
                     b'\t' |
                     b'\n'/* LF */ |
                     0x0C /* FF */ |
-                    b' ' => Ok(()),
+                    b' ' => Ok(None),
                     _ => {
                         todo!()
                     }
@@ -138,7 +144,7 @@ impl Parser {
                         ), 0
                     )?;
                     self.insertion_mode = Mode::BeforeHead;
-                    Ok(())
+                    Ok(None)
                 } else {
                     todo!()
                 }
@@ -152,14 +158,14 @@ impl Parser {
         }
     }
 
-    fn before_head_ruleset(&mut self, token: Token) -> Result<(), HTMLError> {
+    fn before_head_ruleset(&mut self, token: Token) -> ParserResult {
         match token {
             Token::Character(byte) => {
                 match byte {
                     b'\t' |
                     b'\n'/* LF */ |
                     0x0C /* FF */ |
-                    b' ' => Ok(()),
+                    b' ' => Ok(None),
                     _ => {
                         todo!()
                     }
@@ -179,21 +185,21 @@ impl Parser {
                     self.dom_tree.set_head(head_ref);
                     self.open_elements.push(head_ref);
                     self.insertion_mode = Mode::InHead;
-                    Ok(())
+                    Ok(None)
                 } else { todo!() }
             },
             _ => todo!()
         }
     }
 
-    fn in_head_ruleset(&mut self, token: Token) -> Result<(), HTMLError> {
+    fn in_head_ruleset(&mut self, token: Token) -> ParserResult {
         match token {
             Token::Character(byte) => {
                 match byte {
                     b'\t' |
                     b'\n'/* LF */ |
                     0x0C /* FF */ |
-                    b' ' => Ok(()),
+                    b' ' => Ok(None),
                     _ => {
                         todo!()
                     }
@@ -214,7 +220,7 @@ impl Parser {
         }
     }
 
-    fn generic_rcdata_element_ruleset(&mut self, token: &Token) -> Result<(), HTMLError> {
+    fn generic_rcdata_element_ruleset(&mut self, token: &Token) -> ParserResult {
         match token {
             Token::StartTag(tag) => {
                 self.dom_tree.insert(
@@ -222,12 +228,14 @@ impl Parser {
                         dom_string_from_token_string(&tag.name),
                         "id".to_string(),
                         tag.get_class_list().unwrap_or_default(),
-                    ), *self.open_elements.last().unwrap()
+                    ), *self.open_elements.last().unwrap() // TODO: cleanup
                 );
             },
             _ => todo!(),
         }
-        Ok(())
+        self.original_mode = Some(self.insertion_mode);
+        self.insertion_mode = Mode::Text;
+        Ok(Some(TokenizerState::RCData))
     }
     
     fn generic_raw_text_element_ruleset() -> Result<(), HTMLError> {

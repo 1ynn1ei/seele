@@ -219,6 +219,13 @@ impl Parser {
             _ => { todo!() }
         }
     }
+    
+    fn in_text_ruleset(&mut self, token: Token) -> ParserResult {
+        match token {
+            Token::Character(byte) => todo!(),
+            _ => todo!()
+        }
+    }
 
     fn generic_rcdata_element_ruleset(&mut self, token: &Token) -> ParserResult {
         match token {

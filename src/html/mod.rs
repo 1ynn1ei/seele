@@ -22,13 +22,10 @@ pub fn make_dom(data: &Vec<u8>) -> Result<(), HTMLError> {
                 _ => {
                     println!("[TOKENIZER EMIT: {:?}]", token.present());
                     match parser.parse_token(token) {
-                        Ok(token_state) => {
-                            match token_state {
-                                Some(state) => {
-                                    tokenizer.state = state;
-                                },
-                                None => {
-                                }
+                        Ok(wrapped_return) => {
+                            if let Some(state) = wrapped_return {
+                                println!("[PARSER EMIT: CHANGE Tokenizer TO {:?}]", state);
+                                tokenizer.state = state;
                             }
                         },
                         Err(err) => { return Err(err); }

@@ -4,6 +4,7 @@ mod htmlelement;
 mod headelement;
 mod comment;
 mod document;
+mod text;
 
 pub use documenttype::DocumentType;
 pub use htmlelement::HtmlElement;
@@ -11,6 +12,7 @@ pub use headelement::HeadElement;
 pub use element::Element;
 pub use document::Document;
 pub use comment::Comment;
+pub use text::Text;
 
 use crate::html::HTMLError;
 

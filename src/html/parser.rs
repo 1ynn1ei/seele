@@ -5,6 +5,7 @@ use crate::{
         HTMLError,
         tokens::Token,
         dom,
+        dom::{DomObject, DomTree}
     }
 };
 
@@ -63,7 +64,7 @@ pub struct Parser {
     insertion_mode: Mode,
     original_mode: Option<Mode>,
     open_elements: Vec<ArenaRef>,
-    dom_tree: dom::DomTree,
+    dom_tree: DomTree,
 }
 
 impl Parser {
@@ -73,7 +74,7 @@ impl Parser {
             insertion_mode: Mode::Initial,
             original_mode: None,
             open_elements: Vec::new(),
-            dom_tree: dom::DomTree::new(dom::Document::new()),
+            dom_tree: DomTree::new(DomObject::Document),
         }
     }
 
@@ -100,10 +101,12 @@ impl Parser {
                 // make a new doc type node
                 if cmp_token_string(&doctype.name, "html") {
                     self.dom_tree.insert(
-                        dom::DocumentType::new(
-                            dom_string_from_token_string(&doctype.name),
-                            None,
-                            None 
+                        DomObject::DocumentType(
+                            dom::DocumentType::new(
+                                dom_string_from_token_string(&doctype.name),
+                                None,
+                                None 
+                            )
                         ), 0
                     )?;
                     // self.template_insertion_modes.push(Mode::BeforeHtml);
@@ -140,8 +143,7 @@ impl Parser {
             Token::StartTag(tag) => {
                 if cmp_token_string(&tag.name, "html") {
                     self.dom_tree.insert(
-                        dom::HeadElement::new(
-                        ), 0
+                        DomObject::Head, 0
                     )?;
                     self.insertion_mode = Mode::BeforeHead;
                     Ok(None)
@@ -179,8 +181,7 @@ impl Parser {
                 }
                 if cmp_token_string(&tag.name, "head") {
                     let head_ref = self.dom_tree.insert(
-                        dom::HeadElement::new(
-                        ), 0
+                        DomObject::Head, 0
                     )?;
                     self.dom_tree.set_head(head_ref);
                     self.open_elements.push(head_ref);
@@ -231,10 +232,8 @@ impl Parser {
         match token {
             Token::StartTag(tag) => {
                 self.dom_tree.insert(
-                    dom::Element::new(
+                    DomObject::Element(
                         dom_string_from_token_string(&tag.name),
-                        "id".to_string(),
-                        tag.get_class_list().unwrap_or_default(),
                     ), *self.open_elements.last().unwrap() // TODO: cleanup
                 );
             },
@@ -250,8 +249,6 @@ impl Parser {
     }
 
     fn insert_text_or_create_node(&mut self, data: String) {
-        let open_ref = self.open_elements.last().unwrap();
-        let obj_box = self.dom_tree.get_domobj_mut(*open_ref);
 
     }
 }

@@ -102,11 +102,10 @@ impl<'stream> Token<'stream> {
     }
 
     pub fn present(&self) -> String {
-        match *self {
+        match self {
             Self::EndOfFile => String::from("EOF"),
             Self::Doctype(doctype) => {
                 let mut fmt_str = String::new();
-                doctype.test();
                 fmt_str.push_str("DocType ");
                 fmt_str
             },

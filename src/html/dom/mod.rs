@@ -1,22 +1,17 @@
 mod documenttype;
-mod element;
-mod htmlelement;
-mod headelement;
-mod comment;
-mod document;
-mod text;
 
 pub use documenttype::DocumentType;
-pub use htmlelement::HtmlElement;
-pub use headelement::HeadElement;
-pub use element::Element;
-pub use document::Document;
-pub use comment::Comment;
-pub use text::Text;
 
 use crate::html::HTMLError;
-
 use crate::arena::{ArenaRef, Arena};
+
+pub enum DomObject {
+    Document,
+    DocumentType(DocumentType),
+    Element(String),
+    Head,
+    Text(String)
+}
 
 pub struct DomTree {
     root: Option<ArenaRef>,
@@ -26,7 +21,7 @@ pub struct DomTree {
 }
 
 impl DomTree {
-    pub fn new(root: Box<dyn DomObject>) -> Self {
+    pub fn new(root: DomObject) -> Self {
         let mut arena = Arena::new();
         let root_ref = arena.add(DomNode::new(root));
         Self {
@@ -39,7 +34,7 @@ impl DomTree {
 
     pub fn insert (
             &mut self, 
-            obj: Box<dyn DomObject>, 
+            obj: DomObject, 
             parent_ref: ArenaRef) -> Result<ArenaRef, HTMLError> {
         let mut node = DomNode::new(obj);
         node.parent = Some(parent_ref);
@@ -52,11 +47,6 @@ impl DomTree {
         }
     }
     
-    pub fn get_domobj_mut(&mut self, item_ref: ArenaRef) -> &mut Box<dyn DomObject> {
-        let mut node = self.arena.get_mut(item_ref).unwrap();
-        &mut node.dom_obj
-    }
-
     pub fn set_doctype(&mut self, doctype: ArenaRef) {
         self.doctype = Some(doctype);
     }
@@ -69,11 +59,11 @@ impl DomTree {
 pub struct DomNode {
     parent: Option<ArenaRef>,
     children: Vec<ArenaRef>,
-    dom_obj: Box<dyn DomObject>
+    dom_obj: DomObject
 }
 
 impl DomNode {
-    pub fn new(obj: Box<dyn DomObject>) -> Self {
+    pub fn new(obj: DomObject) -> Self {
         Self {
             parent: None,
             children: Vec::new(),
@@ -81,6 +71,3 @@ impl DomNode {
         }
     }
 }
-
-pub trait DomObject {}
-

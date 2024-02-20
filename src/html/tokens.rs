@@ -102,10 +102,11 @@ impl<'stream> Token<'stream> {
     }
 
     pub fn present(&self) -> String {
-        match self {
+        match *self {
             Self::EndOfFile => String::from("EOF"),
             Self::Doctype(doctype) => {
                 let mut fmt_str = String::new();
+                doctype.test();
                 fmt_str.push_str("DocType ");
                 fmt_str
             },
@@ -158,6 +159,12 @@ pub struct DocType<'stream> {
     public_id: Vec<&'stream u8>, 
     system_id: Vec<&'stream u8>,
     force_quirks: bool,
+}
+
+impl<'stream> DocType<'stream> {
+    pub fn test(&mut self) {
+        self.force_quirks = true;
+    }
 }
 
 // TODO: this needs to go 

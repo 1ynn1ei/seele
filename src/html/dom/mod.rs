@@ -51,6 +51,11 @@ impl DomTree {
             Err(HTMLError::InaccessibleDomTreeNode)
         }
     }
+    
+    pub fn get_domobj_mut(&mut self, item_ref: ArenaRef) -> &mut Box<dyn DomObject> {
+        let mut node = self.arena.get_mut(item_ref).unwrap();
+        &mut node.dom_obj
+    }
 
     pub fn set_doctype(&mut self, doctype: ArenaRef) {
         self.doctype = Some(doctype);

@@ -248,4 +248,10 @@ impl Parser {
     fn generic_raw_text_element_ruleset() -> Result<(), HTMLError> {
         todo!()
     }
+
+    fn insert_text_or_create_node(&mut self, data: String) {
+        let open_ref = self.open_elements.last().unwrap();
+        let obj_box = self.dom_tree.get_domobj_mut(*open_ref);
+
+    }
 }

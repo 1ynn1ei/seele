@@ -8,6 +8,7 @@ pub enum HTMLError {
     TokenBuilderImproperlyCleared,
     ParserWithoutInsertionMode,
     InaccessibleDomTreeNode,
+    OrphanObject,
     ParseError,
 }
 

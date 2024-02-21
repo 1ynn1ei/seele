@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub struct DocumentType {
     name: String,
     public_id: String,

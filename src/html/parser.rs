@@ -8,6 +8,7 @@ use crate::{
         dom::{DomObject, DomTree}
     }
 };
+use std::mem;
 
 type TokenizerState = tokenizer::States;
 type ParserResult = Result<Option<TokenizerState>, HTMLError>;
@@ -64,6 +65,7 @@ pub struct Parser {
     insertion_mode: Mode,
     original_mode: Option<Mode>,
     open_elements: Vec<ArenaRef>,
+    last_element: ArenaRef,
     dom_tree: DomTree,
 }
 
@@ -74,6 +76,7 @@ impl Parser {
             insertion_mode: Mode::Initial,
             original_mode: None,
             open_elements: Vec::new(),
+            last_element: 0,
             dom_tree: DomTree::new(DomObject::Document),
         }
     }
@@ -86,6 +89,7 @@ impl Parser {
             Mode::BeforeHtml => self.before_html_ruleset(token),
             Mode::BeforeHead => self.before_head_ruleset(token),
             Mode::InHead => self.in_head_ruleset(token),
+            Mode::Text => self.in_text_ruleset(token),
             _ => todo!()
         }
         // } else {
@@ -223,7 +227,12 @@ impl Parser {
     
     fn in_text_ruleset(&mut self, token: Token) -> ParserResult {
         match token {
-            Token::Character(byte) => todo!(),
+            Token::Character(byte) => {
+                self.insert_or_merge_text_into_tree(
+                    String::from_utf8(vec![*byte]).unwrap()
+                    )?;
+                Ok(None)
+            },
             _ => todo!()
         }
     }
@@ -248,7 +257,31 @@ impl Parser {
         todo!()
     }
 
-    fn insert_text_or_create_node(&mut self, data: String) {
+    fn insert_into_tree(&mut self, obj: DomObject) -> Result<(), HTMLError> {
+        if let Some(parent_ref) = self.open_elements.last() {
+            let new_ref = self.dom_tree.insert(
+                obj, *parent_ref
+            )?;
+            self.last_element = new_ref;
+            Ok(())
+        } else {
+            Err(HTMLError::OrphanObject)
+        }
+    }
 
+    fn insert_or_merge_text_into_tree(&mut self, data: String) -> Result<(), HTMLError> {
+        if let Some(node) = self.dom_tree.arena.get_mut(self.last_element) {
+            match node.dom_obj {
+                DomObject::Text(ref mut string) => {
+                    string.push_str(&data);
+                    Ok(())
+                },
+                _ => {
+                    self.insert_into_tree(DomObject::Text(data))
+                }
+            }
+        } else {
+            Err(HTMLError::OrphanObject)
+        }
     }
 }

@@ -7,6 +7,7 @@ pub mod tokenizer;
 pub enum HTMLError {
     TokenBuilderImproperlyCleared,
     ParserWithoutInsertionMode,
+    ParserLostOriginalMode,
     InaccessibleDomTreeNode,
     OrphanObject,
     ParseError,

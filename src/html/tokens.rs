@@ -79,6 +79,11 @@ impl<'stream> TokenBuilder<'stream> {
         self.buffer = Vec::new();
         token
     }
+
+    pub fn check_tag_validitiy(&self) -> bool {
+        // TODO: compare buffer to self.last_tag
+        true
+    }
 }
 
 

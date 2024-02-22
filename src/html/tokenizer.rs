@@ -290,6 +290,60 @@ impl<'stream> Tokenizer<'stream> {
                 }
             },
 
+            States::RCDataLessThanSign => {
+                match char {
+                    b'/' => {
+                        self.state = States::RCDataEndTagOpen;
+                    },
+                    _ => {
+                        self.builder.set_variant(TokenVariant::Character)?;
+                        self.builder.buffer.push(&b'<');
+                        self.state = States::RCData;
+                        self.stream.reconsume();
+                        return Ok(Some(self.builder.build()));
+                    }
+                }
+            },
+            States::RCDataEndTagOpen => {
+                match char {
+                    b'a'..=b'z' | b'A'..=b'Z' => {
+                        self.builder.set_variant(TokenVariant::EndTag);
+                        self.state = States::RCDataEndTagName;
+                        self.stream.reconsume();
+                    },
+                    _ => todo!()
+                }
+            },
+            States::RCDataEndTagName => {
+                match char {
+                    b'\t' |
+                    b'\n'/* LF */ |
+                    0x0C /* FF */ |
+                    b' ' => {
+                        if self.builder.check_tag_validitiy() {
+                            self.state = States::BeforeAttributeName;
+                        } else {
+                            todo!()
+                        }
+                    },
+                    b'/' => todo!(),
+                    b'>' => {
+                        if self.builder.check_tag_validitiy() {
+                            self.state = States::Data;
+                            return Ok(Some(self.builder.build()));
+                        } else {
+                            todo!()
+                        }
+                    },
+                    b'a'..=b'z' | b'A'..=b'Z' => {
+                        self.builder.tag.name.push(char);
+                    },
+                    _ => todo!()
+                }
+            },
+            // RawTextLessThanSign,
+            // RawTextEndTagOpen,
+            // RawTextEndTagName,
             States::BeforeAttributeName => {
                 match char {
                     b'\t' |

@@ -220,7 +220,11 @@ impl Parser {
                     _ => todo!(),
                 }
             },
-            Token::EndTag(tag) => todo!(),
+            Token::EndTag(_) => {
+                self.open_elements.pop();
+                self.insertion_mode = Mode::AfterHead;
+                Ok(None)
+            },
             _ => { todo!() }
         }
     }
@@ -232,6 +236,15 @@ impl Parser {
                     String::from_utf8(vec![*byte]).unwrap()
                     )?;
                 Ok(None)
+            },
+            Token::EndTag(tag) => {
+                self.open_elements.pop();
+                if let Some(original_mode) = self.original_mode {
+                    self.insertion_mode = original_mode; 
+                    Ok(None)
+                } else {
+                    Err(HTMLError::ParserLostOriginalMode)
+                }
             },
             _ => todo!()
         }

@@ -75,7 +75,7 @@ impl Parser {
             // template_insertion_modes: vec![Mode::Initial],
             insertion_mode: Mode::Initial,
             original_mode: None,
-            open_elements: Vec::new(),
+            open_elements: vec![0], 
             last_element: 0,
             dom_tree: DomTree::new(DomObject::Document),
         }
@@ -91,6 +91,7 @@ impl Parser {
             Mode::InHead => self.in_head_ruleset(token),
             Mode::InHeadNoscript => todo!(),
             Mode::AfterHead => self.after_head_ruleset(token),
+            Mode::InBody => self.in_body_ruleset(token),
             Mode::Text => self.in_text_ruleset(token),
             _ => todo!()
         }
@@ -148,9 +149,10 @@ impl Parser {
             },
             Token::StartTag(tag) => {
                 if cmp_token_string(&tag.name, "html") {
-                    self.dom_tree.insert(
-                        DomObject::Head, 0
+                    let html_ref = self.dom_tree.insert(
+                        DomObject::Element(String::from("html")), 0
                     )?;
+                    self.open_elements.push(html_ref);
                     self.insertion_mode = Mode::BeforeHead;
                     Ok(None)
                 } else {
@@ -223,6 +225,7 @@ impl Parser {
                 }
             },
             Token::EndTag(_) => {
+                println!("{:?}", self.open_elements);
                 self.open_elements.pop();
                 self.insertion_mode = Mode::AfterHead;
                 Ok(None)
@@ -254,21 +257,51 @@ impl Parser {
 
     fn after_head_ruleset(&mut self, token: Token) -> ParserResult {
         match token {
+            Token::Character(byte) => {
+                match byte {
+                    b'\t' |
+                    b'\n'/* LF */ |
+                    0x0C /* FF */ |
+                    b' ' => {
+                        self.insert_or_merge_text_into_tree(
+                            String::from_utf8(vec![*byte]).unwrap()
+                            )?;
+                        Ok(None)
+                    },
+                    _ => todo!(),
+                }
+            },
             Token::StartTag(tag) => {
                 let tag_name = dom_string_from_token_string(&tag.name);
                 match tag_name.as_str() {
                     "body" => {
-                        self.dom_tree.insert(
+                        let body_ref = self.dom_tree.insert(
                             DomObject::Element(
                                 tag_name,
                             ), *self.open_elements.last().unwrap() // TODO: cleanup
-                        );
+                        )?;
+                        self.open_elements.push(body_ref);
                         // TODO: frameset-ok = 'not ok'
                         self.insertion_mode = Mode::InBody;
                         Ok(None)
                     },
                     _ => todo!(),
                 }
+            },
+            _ => todo!()
+        }
+    }
+
+    fn in_body_ruleset(&mut self, token: Token) -> ParserResult {
+        match token {
+            Token::Character(byte) => {
+                self.insert_or_merge_text_into_tree(
+                    String::from_utf8(vec![*byte]).unwrap()
+                    )?;
+                Ok(None)
+            },
+            Token::EndTag(tag) => {
+
             },
             _ => todo!()
         }

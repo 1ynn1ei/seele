@@ -110,7 +110,9 @@ impl<'stream> Tokenizer<'stream> {
     }
 
     pub fn get_next_token(&mut self) -> Result<Option<Token>, HTMLError> {
-        if self.stream.is_eof() {
+        if !self.tokens.is_empty() {
+            Ok(self.tokens.pop())
+        } else if self.stream.is_eof() {
             // TODO: we need to handle EOF differnet for some states
             Ok(Some(Token::EndOfFile))
         } else {

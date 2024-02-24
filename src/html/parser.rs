@@ -89,6 +89,8 @@ impl Parser {
             Mode::BeforeHtml => self.before_html_ruleset(token),
             Mode::BeforeHead => self.before_head_ruleset(token),
             Mode::InHead => self.in_head_ruleset(token),
+            Mode::InHeadNoscript => todo!(),
+            Mode::AfterHead => self.after_head_ruleset(token),
             Mode::Text => self.in_text_ruleset(token),
             _ => todo!()
         }
@@ -244,6 +246,28 @@ impl Parser {
                     Ok(None)
                 } else {
                     Err(HTMLError::ParserLostOriginalMode)
+                }
+            },
+            _ => todo!()
+        }
+    }
+
+    fn after_head_ruleset(&mut self, token: Token) -> ParserResult {
+        match token {
+            Token::StartTag(tag) => {
+                let tag_name = dom_string_from_token_string(&tag.name);
+                match tag_name.as_str() {
+                    "body" => {
+                        self.dom_tree.insert(
+                            DomObject::Element(
+                                tag_name,
+                            ), *self.open_elements.last().unwrap() // TODO: cleanup
+                        );
+                        // TODO: frameset-ok = 'not ok'
+                        self.insertion_mode = Mode::InBody;
+                        Ok(None)
+                    },
+                    _ => todo!(),
                 }
             },
             _ => todo!()

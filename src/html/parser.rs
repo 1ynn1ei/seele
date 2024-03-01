@@ -33,6 +33,16 @@ fn dom_string_from_token_string(token_string: &[&u8]) -> String {
         .collect()).unwrap()
 }
 
+fn byte_is_whitespacish(byte: &u8) -> bool {
+    match byte {
+        b'\t' |
+        b'\n'/* LF */ |
+        0x0C /* FF */ |
+        b' ' => true,
+        _ => false,
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum Mode {
     Initial,
@@ -93,6 +103,8 @@ impl Parser {
             Mode::AfterHead => self.after_head_ruleset(token),
             Mode::InBody => self.in_body_ruleset(token),
             Mode::Text => self.in_text_ruleset(token),
+            Mode::AfterBody => self.after_body_ruleset(token),
+            Mode::AfterAfterBody => self.after_after_body_ruleset(token),
             _ => todo!()
         }
         // } else {
@@ -301,7 +313,52 @@ impl Parser {
                 Ok(None)
             },
             Token::EndTag(tag) => {
+                let tag_name = dom_string_from_token_string(&tag.name);
+                match tag_name.as_str() {
+                    "body" => {
+                        // TODO: check if body is in scope
+                        // TODO: check rest of elements in stack
+                        self.insertion_mode = Mode::AfterBody;
+                        Ok(None)
+                    },
+                    _ => todo!()
+                }
+            },
+            _ => todo!()
+        }
+    }
 
+    fn after_body_ruleset(&mut self, token: Token) -> ParserResult {
+        match token {
+            Token::Character(byte) => {
+                if byte_is_whitespacish(byte) {
+                    self.in_body_ruleset(token)
+                } else {
+                    todo!()
+                }
+            },
+            Token::EndTag(tag) => {
+                let tag_name = dom_string_from_token_string(&tag.name);
+                match tag_name.as_str() {
+                    "html" => {
+                        self.insertion_mode = Mode::AfterAfterBody;
+                        Ok(None)
+                    },
+                    _ => todo!()
+                }
+            },
+            _ => todo!()
+        }
+    }
+
+    fn after_after_body_ruleset(&mut self, token: Token) -> ParserResult {
+        match token {
+            Token::Character(byte) => {
+                if byte_is_whitespacish(byte) {
+                    self.in_body_ruleset(token)
+                } else {
+                    todo!()
+                }
             },
             _ => todo!()
         }

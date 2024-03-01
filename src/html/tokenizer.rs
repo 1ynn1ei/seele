@@ -92,7 +92,7 @@ pub enum States {
 
 pub struct Tokenizer<'stream> {
     stream: Stream<'stream>,
-    state: States,
+    pub state: States,
     return_state: States,
     tokens: TokenList<'stream>,
     builder: TokenBuilder<'stream>,
@@ -110,11 +110,13 @@ impl<'stream> Tokenizer<'stream> {
     }
 
     pub fn get_next_token(&mut self) -> Result<Option<Token>, HTMLError> {
-        if self.stream.is_eof() {
+        if !self.tokens.is_empty() {
+            Ok(self.tokens.pop())
+        } else if self.stream.is_eof() {
             // TODO: we need to handle EOF differnet for some states
             Ok(Some(Token::EndOfFile))
         } else {
-            println!("{:?}", self.state);
+            println!("[TOKENIZER STATE:{:?}]", self.state);
             self.run_state()
         }
     }
@@ -290,6 +292,60 @@ impl<'stream> Tokenizer<'stream> {
                 }
             },
 
+            States::RCDataLessThanSign => {
+                match char {
+                    b'/' => {
+                        self.state = States::RCDataEndTagOpen;
+                    },
+                    _ => {
+                        self.builder.set_variant(TokenVariant::Character)?;
+                        self.builder.buffer.push(&b'<');
+                        self.state = States::RCData;
+                        self.stream.reconsume();
+                        return Ok(Some(self.builder.build()));
+                    }
+                }
+            },
+            States::RCDataEndTagOpen => {
+                match char {
+                    b'a'..=b'z' | b'A'..=b'Z' => {
+                        self.builder.set_variant(TokenVariant::EndTag);
+                        self.state = States::RCDataEndTagName;
+                        self.stream.reconsume();
+                    },
+                    _ => todo!()
+                }
+            },
+            States::RCDataEndTagName => {
+                match char {
+                    b'\t' |
+                    b'\n'/* LF */ |
+                    0x0C /* FF */ |
+                    b' ' => {
+                        if self.builder.check_tag_validitiy() {
+                            self.state = States::BeforeAttributeName;
+                        } else {
+                            todo!()
+                        }
+                    },
+                    b'/' => todo!(),
+                    b'>' => {
+                        if self.builder.check_tag_validitiy() {
+                            self.state = States::Data;
+                            return Ok(Some(self.builder.build()));
+                        } else {
+                            todo!()
+                        }
+                    },
+                    b'a'..=b'z' | b'A'..=b'Z' => {
+                        self.builder.tag.name.push(char);
+                    },
+                    _ => todo!()
+                }
+            },
+            // RawTextLessThanSign,
+            // RawTextEndTagOpen,
+            // RawTextEndTagName,
             States::BeforeAttributeName => {
                 match char {
                     b'\t' |
@@ -518,6 +574,7 @@ impl<'stream> Tokenizer<'stream> {
                     b'>' => {
                         self.state = States::Data;
                         self.builder.set_variant(TokenVariant::Doctype)?;
+                        self.builder.commit_buffer_to_doctype_name();
                         return Ok(Some(self.builder.build()));
                     },
                     b'A'..=b'Z' => {

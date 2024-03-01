@@ -1,70 +1,81 @@
 mod documenttype;
-mod htmlelement;
-mod headelement;
-mod comment;
 
 pub use documenttype::DocumentType;
-pub use htmlelement::HtmlElement;
-pub use headelement::HeadElement;
-pub use comment::Comment;
 
 use crate::html::HTMLError;
-
 use crate::arena::{ArenaRef, Arena};
+
+#[derive(Debug)]
+pub enum DomObject {
+    Document,
+    DocumentType(DocumentType),
+    Element(String),
+    Head,
+    Text(String)
+}
 
 pub struct DomTree {
     root: Option<ArenaRef>,
-    arena: Arena<DomNode>
+    doctype: Option<ArenaRef>,
+    head: Option<ArenaRef>,
+    pub arena: Arena<DomNode>,
 }
 
 impl DomTree {
-    pub fn new() -> Self {
+    pub fn new(root: DomObject) -> Self {
+        let mut arena = Arena::new();
+        let root_ref = arena.add(DomNode::new(root));
         Self {
-            root: None,
-            arena: Arena::new(),
+            root: Some(root_ref),
+            doctype: None,
+            head: None,
+            arena,
         }
     }
 
-    pub fn insert<T:DomObject> (
+    pub fn insert (
             &mut self, 
-            obj: T, 
-            parent: ArenaRef) -> Result<ArenaRef, HTMLError> {
-        let mut node = DomNode::new(Box::new(obj));
-        node.parent = Some(parent);
+            obj: DomObject, 
+            parent_ref: ArenaRef) -> Result<ArenaRef, HTMLError> {
+        let mut node = DomNode::new(obj);
+        node.parent = Some(parent_ref);
         let child_ref : ArenaRef = self.arena.add(node);
-        if let Some(parent) = self.arena.get_mut(parent) {
+        if let Some(parent) = self.arena.get_mut(parent_ref) {
             parent.children.push(child_ref);
             Ok(child_ref)
         } else {
             Err(HTMLError::InaccessibleDomTreeNode)
         }
     }
+    
+    pub fn set_doctype(&mut self, doctype: ArenaRef) {
+        self.doctype = Some(doctype);
+    }
+
+    pub fn set_head(&mut self, head: ArenaRef) {
+        self.head = Some(head);
+    }
+
+    pub fn get_last_child_of(&mut self, node_ref: ArenaRef) -> &mut DomObject {
+        let node = self.arena.get(node_ref).unwrap();
+        let child_ref = node.children.last().unwrap();
+        let mut child_node = self.arena.get_mut(*child_ref).unwrap();
+        &mut child_node.dom_obj
+    }
 }
 
 pub struct DomNode {
     parent: Option<ArenaRef>,
-    children: Vec<ArenaRef>,
-    dom_obj: Box<dyn DomObject>
+    pub children: Vec<ArenaRef>,
+    pub dom_obj: DomObject
 }
 
 impl DomNode {
-    pub fn new(obj: Box<dyn DomObject>) -> Self {
+    pub fn new(obj: DomObject) -> Self {
         Self {
             parent: None,
             children: Vec::new(),
             dom_obj: obj
         }
     }
-}
-
-pub trait DomObject {
-
-}
-
-#[derive(Default)]
-pub struct Document {
-    title: String,
-    dir: String,
-    body: Option<Box<dyn DomObject>>,
-    // head: Option<Element>,
 }

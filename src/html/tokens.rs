@@ -79,6 +79,11 @@ impl<'stream> TokenBuilder<'stream> {
         self.buffer = Vec::new();
         token
     }
+
+    pub fn check_tag_validitiy(&self) -> bool {
+        // TODO: compare buffer to self.last_tag
+        true
+    }
 }
 
 
@@ -94,7 +99,7 @@ pub enum Token<'stream> {
 
 impl<'stream> Token<'stream> {
 
-    fn printer_hepler(&self, data: &[&'stream u8]) -> String {
+    fn printer_helper(&self, data: &[&'stream u8]) -> String {
         String::from_utf8(data
             .iter()
             .map(|&x| *x)
@@ -104,9 +109,20 @@ impl<'stream> Token<'stream> {
     pub fn present(&self) -> String {
         match self {
             Self::EndOfFile => String::from("EOF"),
-            Self::Comment(data) => self.printer_hepler(data),
+            Self::Doctype(doctype) => {
+                let mut fmt_str = String::new();
+                fmt_str.push_str("DocType ");
+                fmt_str
+            },
+            Self::Comment(data) => {
+                let mut fmt_str = "Comment: ".to_string();
+                fmt_str.push_str(&self.printer_helper(data));
+                fmt_str
+            },
             Self::Character(byte) => {
-                self.printer_hepler(&[*byte])
+                let mut fmt_str = "Character: ".to_string();
+                fmt_str.push_str(&self.printer_helper(&[*byte]));
+                fmt_str
             },
             Self::EndTag(tag) |
             Self::StartTag(tag) => {
@@ -116,23 +132,17 @@ impl<'stream> Token<'stream> {
                     Self::StartTag(_) => fmt_str.push_str("StartTag: "),
                     _ => {}
                 }
-                fmt_str.push_str(&self.printer_hepler(&tag.name));
+                fmt_str.push_str(&self.printer_helper(&tag.name));
                 fmt_str.push('[');
                 for i in 0..tag.attr_keys.len() {
                     fmt_str.push(' ');
                     let key = tag.attr_keys.get(i).unwrap();
-                    let key_str = String::from_utf8(key
-                                .iter()
-                                .map(|&x| *x)
-                                .collect()).unwrap();
+                    let key_str = self.printer_helper(key); 
                     fmt_str.push_str(&key_str);
                     fmt_str.push_str(": ");
                     match tag.attr_values.get(i) {
                         Some(bytes) => {
-                            fmt_str.push_str(&String::from_utf8(bytes
-                                        .iter()
-                                        .map(|&x| *x)
-                                        .collect()).unwrap());
+                            fmt_str.push_str(&self.printer_helper(bytes));
                         },
                         None => {
                             fmt_str.push_str("EMPTY");
@@ -142,7 +152,6 @@ impl<'stream> Token<'stream> {
                 fmt_str.push(']');
                 fmt_str
             }
-            _ => String::from("TBD")
         }
     }
 }
@@ -150,10 +159,24 @@ impl<'stream> Token<'stream> {
 //https://html.spec.whatwg.org/multipage/parsing.html#tokenization
 #[derive(Debug, Default)]
 pub struct DocType<'stream> {
-    name: Vec<&'stream u8>, 
+    pub name: Vec<&'stream u8>, 
     public_id: Vec<&'stream u8>, 
     system_id: Vec<&'stream u8>,
     force_quirks: bool,
+}
+
+impl<'stream> DocType<'stream> {
+    pub fn test(&mut self) {
+        self.force_quirks = true;
+    }
+}
+
+// TODO: this needs to go 
+fn dom_string_from_token_string(token_string: &[&u8]) -> String {
+    String::from_utf8(token_string
+        .iter()
+        .map(|&x| *x)
+        .collect()).unwrap()
 }
 
 #[derive(Debug, Default)]
@@ -162,5 +185,18 @@ pub struct Tag<'stream> {
     pub self_closing: bool,
     pub attr_keys: Vec<Vec<&'stream u8>>,
     pub attr_values: Vec<Vec<&'stream u8>>,
+}
+
+impl<'stream> Tag<'stream> {
+    pub fn get_class_list(&self) -> Option<String> {
+        for (i, val) in self.attr_keys.iter().enumerate() {
+            if dom_string_from_token_string(val) == "class" {
+                return Some(
+                    dom_string_from_token_string(&self.attr_values[i])
+                    );
+            }
+        }
+        None
+    }
 }
 

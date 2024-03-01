@@ -1,3 +1,4 @@
+#![allow(dead_code, unused)]
 mod html;
 mod stream;
 mod arena;
